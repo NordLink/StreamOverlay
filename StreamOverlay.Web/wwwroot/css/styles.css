@@ -1,0 +1,92 @@
+﻿:root {
+    --bg: rgba(0, 0, 0, 0.55);
+    --bg2: rgba(0, 0, 0, 0.35);
+    --text: #ffffff;
+    --muted: rgba(255,255,255,0.75);
+    --accent: #e1b9ff; /* twitch-ish */
+    --border: rgba(255,255,255,0.12);
+}
+
+* {
+    box-sizing: border-box;
+}
+
+html, body {
+    height: 100%;
+    margin: 0;
+    font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
+    color: var(--text);
+}
+
+.overlay {
+    padding: 16px;
+    display: grid;
+    gap: 12px;
+    width: 420px; /* под оверлей */
+}
+
+.topbar {
+    display: grid;
+    grid-template-columns: 1.2fr 0.8fr 0.7fr;
+    gap: 10px;
+    padding: 12px;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    backdrop-filter: blur(6px);
+}
+
+.label {
+    font-size: 12px;
+    color: var(--muted);
+    letter-spacing: 0.2px;
+}
+
+.value {
+    font-size: 16px;
+    font-weight: 700;
+    margin-top: 2px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.chat {
+    background: var(--bg2);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    overflow: hidden;
+    backdrop-filter: blur(6px);
+}
+
+.chat-title {
+    padding: 10px 12px;
+    border-bottom: 1px solid var(--border);
+    font-weight: 700;
+    color: var(--muted);
+}
+
+.chat-list {
+    padding: 10px 12px;
+    display: grid;
+    gap: 6px;
+    max-height: 520px;
+    overflow: auto;
+}
+
+.chat-line {
+    padding: 6px 8px;
+    border-radius: 10px;
+    border: 1px solid rgba(255,255,255,0.08);
+    background: rgba(0,0,0,0.25);
+}
+
+    .chat-line .user {
+        color: var(--accent);
+        font-weight: 800;
+    }
+
+    .chat-line .msg {
+        color: var(--text);
+        font-weight: 500;
+    }
