@@ -1,0 +1,43 @@
+﻿using Microsoft.AspNetCore.SignalR;
+public interface IOverlayBroadcastService
+{
+    Task SendChannelInfoAsync(OverlayChannelInfoDto dto, CancellationToken ct);
+    Task SendViewerCountAsync(OverlayViewerCountDto dto, CancellationToken ct);
+    Task SendChatMessageAsync(OverlayChatMessageDto dto, CancellationToken ct);
+}
+public class SignalROverlayBroadcastService : IOverlayBroadcastService
+{
+    private readonly IHubContext<ChatHub> _hub;
+    public SignalROverlayBroadcastService(IHubContext<ChatHub> hub)
+    {
+        _hub = hub;
+    }
+    public Task SendChannelInfoAsync(OverlayChannelInfoDto dto, CancellationToken ct)
+    {
+        return _hub.Clients.All.SendAsync("channelInfo", new
+        {
+            platform = dto.Platform,
+            login = dto.Login,
+            displayName = dto.DisplayName
+        }, ct);
+    }
+    public Task SendViewerCountAsync(OverlayViewerCountDto dto, CancellationToken ct)
+    {
+        return _hub.Clients.All.SendAsync("viewerCount", new
+        {
+            platform = dto.Platform,
+            count = dto.Count,
+            isLive = dto.IsLive
+        }, ct);
+    }
+    public Task SendChatMessageAsync(OverlayChatMessageDto dto, CancellationToken ct)
+    {
+        return _hub.Clients.All.SendAsync("chatMessage", new
+        {
+            platform = dto.Platform,
+            user = dto.User,
+            message = dto.Message,
+            color = dto.Color
+        }, ct);
+    }
+}

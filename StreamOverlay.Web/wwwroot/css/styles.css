@@ -3,7 +3,7 @@
     --bg2: rgba(0, 0, 0, 0.35);
     --text: #ffffff;
     --muted: rgba(255,255,255,0.75);
-    --accent: #e1b9ff; /* twitch-ish */
+    --accent: #e1b9ff; 
     --border: rgba(255,255,255,0.12);
 }
 
@@ -16,18 +16,19 @@ html, body {
     margin: 0;
     font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
     color: var(--text);
+    background-color: transparent; 
 }
 
 .overlay {
     padding: 16px;
     display: grid;
     gap: 12px;
-    width: 420px; /* под оверлей */
+    width: 420px;
 }
 
 .topbar {
     display: grid;
-    grid-template-columns: 1.2fr 0.8fr 0.7fr;
+    grid-template-columns: 1fr 1fr;
     gap: 10px;
     padding: 12px;
     background: var(--bg);
@@ -36,19 +37,35 @@ html, body {
     backdrop-filter: blur(6px);
 }
 
+.info-block {
+    display: flex;
+    flex-direction: column;
+}
+
 .label {
-    font-size: 12px;
+    font-size: 11px;
     color: var(--muted);
-    letter-spacing: 0.2px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
 }
 
 .value {
-    font-size: 16px;
+    font-size: 15px;
     font-weight: 700;
     margin-top: 2px;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
+}
+
+.viewers-grid {
+    grid-column: span 2;
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 8px;
+    margin-top: 8px;
+    padding-top: 8px;
+    border-top: 1px solid var(--border);
 }
 
 .chat {
@@ -64,21 +81,30 @@ html, body {
     border-bottom: 1px solid var(--border);
     font-weight: 700;
     color: var(--muted);
+    font-size: 12px;
 }
 
 .chat-list {
     padding: 10px 12px;
-    display: grid;
+    display: flex;
+    flex-direction: column;
     gap: 6px;
     max-height: 520px;
-    overflow: auto;
+    overflow-y: auto;
+    scrollbar-width: none;
 }
 
+    .chat-list::-webkit-scrollbar {
+        display: none; 
+    }
+
 .chat-line {
-    padding: 6px 8px;
+    padding: 8px 10px;
     border-radius: 10px;
     border: 1px solid rgba(255,255,255,0.08);
     background: rgba(0,0,0,0.25);
+    line-height: 1.4;
+    word-break: break-word;
 }
 
     .chat-line .user {
@@ -90,3 +116,19 @@ html, body {
         color: var(--text);
         font-weight: 500;
     }
+
+.platform-tag {
+    display: inline-block;
+    margin-right: 8px;
+    padding: 2px 6px;
+    border-radius: 6px;
+    color: #ffffff;
+    font-size: 11px;
+    font-weight: 800;
+    vertical-align: middle;
+    text-transform: uppercase;
+}
+
+.status-badge {
+    font-weight: 800;
+}

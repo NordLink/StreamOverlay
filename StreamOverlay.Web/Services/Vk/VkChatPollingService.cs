@@ -1,0 +1,156 @@
+﻿using Microsoft.Extensions.Options;
+public class VkChatPollingService : BackgroundService
+{
+    private readonly IVkLiveApiClient _vkClient;
+    private readonly IOverlayBroadcastService _broadcast;
+    private readonly VkLiveOptions _options;
+    private readonly ILogger<VkChatPollingService> _logger;
+    private readonly HashSet<long> _seenMessageIds = new();
+    private readonly Queue<long> _seenOrder = new();
+    private const int MaxRememberedIds = 1000;
+    private bool _initialized;
+
+    // Палитра VK используе индексы цветов от 0-15 (message.Author?.NickColor)
+    private static readonly string[] VkColorPalette =
+    {
+        "#D66E34", "#B8AAFF", "#1D90FF", "#9961F9", "#59A840",
+        "#E73629", "#DE6489", "#20BBA1", "#F8B301", "#0099BB",
+        "#7BBEFF", "#E542FF", "#A36C59", "#8BA259", "#00A9FF", "#A20BFF"
+    };
+
+    public VkChatPollingService(
+        IVkLiveApiClient vkClient,
+        IOverlayBroadcastService broadcast,
+        IOptions<VkLiveOptions> options,
+        ILogger<VkChatPollingService> logger)
+    {
+        _vkClient = vkClient;
+        _broadcast = broadcast;
+        _options = options.Value;
+        _logger = logger;
+    }
+
+    protected override async Task ExecuteAsync(CancellationToken stoppingToken)
+    {
+        if (string.IsNullOrWhiteSpace(_options.ChannelUrl))
+        {
+            _logger.LogWarning("VK channel не задан. VkChatPollingService остановлен.");
+            return;
+        }
+        await _broadcast.SendChannelInfoAsync(
+            new OverlayChannelInfoDto("vk", _options.ChannelUrl, _options.ChannelUrl),
+            stoppingToken);
+        while (!stoppingToken.IsCancellationRequested)
+        {
+            try
+            {
+                await PollMessagesAsync(stoppingToken);
+            }
+            catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
+            {
+                break;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Ошибка в VkChatPollingService.");
+            }
+            await Task.Delay(TimeSpan.FromSeconds(_options.ChatPollingSeconds), stoppingToken);
+        }
+    }
+
+    private async Task PollMessagesAsync(CancellationToken ct)
+    {
+        var response = await _vkClient.GetMessagesAsync(50, ct);
+        var messages = response?.Data?.ChatMessages;
+        if (messages is null || messages.Count == 0)
+            return;
+
+        var ordered = messages
+            .Where(x => x is not null)
+            .OrderBy(x => x.CreatedAt)
+            .ThenBy(x => x.Id)
+            .ToList();
+
+        if (!_initialized)
+        {
+            foreach (var message in ordered)
+            {
+                if (message.Id > 0)
+                    RememberId(message.Id);
+            }
+            _initialized = true;
+            _logger.LogInformation("VK chat initialized. Старые сообщения сохранены в cache без отправки в overlay.");
+            return;
+        }
+
+        foreach (var message in ordered)
+        {
+            if (message.Id <= 0 || _seenMessageIds.Contains(message.Id))
+                continue;
+
+            var user = string.IsNullOrWhiteSpace(message.Author?.Nick)
+                ? "VK User"
+                : message.Author!.Nick!;
+
+            var text = BuildMessageText(message.Parts);
+            if (string.IsNullOrWhiteSpace(text))
+                text = "[empty]";
+
+            var color = GetColorFromPalette(message.Author?.NickColor);
+            await _broadcast.SendChatMessageAsync(
+                new OverlayChatMessageDto("vk", user, text, color),
+                ct);
+
+            RememberId(message.Id);
+        }
+    }
+
+    private void RememberId(long id)
+    {
+        if (_seenMessageIds.Add(id))
+            _seenOrder.Enqueue(id);
+        while (_seenOrder.Count > MaxRememberedIds)
+        {
+            var oldest = _seenOrder.Dequeue();
+            _seenMessageIds.Remove(oldest);
+        }
+    }
+
+    private static string BuildMessageText(List<VkPart>? parts)
+    {
+        if (parts is null || parts.Count == 0)
+            return string.Empty;
+        var chunks = new List<string>();
+        foreach (var part in parts)
+        {
+            if (!string.IsNullOrWhiteSpace(part.Text?.Content))
+            {
+                chunks.Add(part.Text.Content);
+                continue;
+            }
+            if (!string.IsNullOrWhiteSpace(part.Link?.Content))
+            {
+                chunks.Add(part.Link.Content);
+                continue;
+            }
+            if (!string.IsNullOrWhiteSpace(part.Mention?.Nick))
+            {
+                chunks.Add("@" + part.Mention.Nick);
+                continue;
+            }
+            if (!string.IsNullOrWhiteSpace(part.Smile?.Name))
+            {
+                chunks.Add(":" + part.Smile.Name + ":");
+            }
+        }
+        return string.Concat(chunks);
+    }
+
+    private static string? GetColorFromPalette(int? colorIndex)
+    {
+        if (colorIndex is null || colorIndex < 0 || colorIndex >= VkColorPalette.Length)
+            return null;
+
+        return VkColorPalette[colorIndex.Value];
+    }
+}

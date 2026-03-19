@@ -5,30 +5,40 @@
     <meta name="viewport" content="width=device-width,initial-scale=1" />
     <title>Stream Overlay</title>
     <link rel="stylesheet" href="/css/styles.css" />
-    <!-- SignalR -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/microsoft-signalr/7.0.5/signalr.min.js"></script>
     <script defer src="/js/app.js"></script>
 </head>
 <body>
     <div class="overlay">
-        <header class="topbar">
-            <div class="channel">
+        <div class="topbar">
+            <div class="info-block">
                 <div class="label">Канал</div>
                 <div id="channelName" class="value">—</div>
             </div>
-            <div class="viewers">
-                <div class="label">Зрителей</div>
-                <div class="value"><span id="viewerCount">0</span></div>
-            </div>
-            <div class="status">
+            <div class="info-block" style="text-align: right;">
                 <div class="label">Статус</div>
-                <div id="liveStatus" class="value">—</div>
+                <div id="liveStatus" class="value status-badge">CONNECTING</div>
             </div>
-        </header>
-        <main class="chat">
-            <div class="chat-title">Twitch Chat</div>
-            <div id="chat" class="chat-list"></div>
-        </main>
+            <div class="viewers-grid">
+                <div class="info-block">
+                    <div class="label">Twitch</div>
+                    <div id="twitchViewers" class="value">0</div>
+                </div>
+                <div class="info-block">
+                    <div class="label">VK</div>
+                    <div id="vkViewers" class="value">0</div>
+                </div>
+                <div class="info-block" style="text-align: right;">
+                    <div class="label">Всего</div>
+                    <div id="viewerCount" class="value">0</div>
+                </div>
+            </div>
+        </div>
+        <div class="chat">
+            <div class="chat-title">LIVE CHAT</div>
+            <div id="chat" class="chat-list">
+            </div>
+        </div>
     </div>
 </body>
 </html>
