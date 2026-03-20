@@ -35,7 +35,7 @@ public class TwitchChatService : BackgroundService
                 var userName = string.IsNullOrWhiteSpace(e.ChatMessage.DisplayName)
                     ? e.ChatMessage.Username
                     : e.ChatMessage.DisplayName;
-                var userColor = ResolveUserColor(e.ChatMessage.UserId, userName, e.ChatMessage.HexColor);
+                var userColor = ResolveUserColor(e.ChatMessage.Username, e.ChatMessage.HexColor);
                 await _broadcast.SendChatMessageAsync(
                     new OverlayChatMessageDto(
                         "twitch",
@@ -66,28 +66,28 @@ public class TwitchChatService : BackgroundService
             await _client.DisconnectAsync();
     }
     private static readonly string[] TwitchDefaultColors =
-    {
+      {
         "#FF0000", "#0000FF", "#008000", "#B22222", "#FF7F50",
         "#9ACD32", "#FF4500", "#2E8B57", "#DAA520", "#D2691E",
         "#5F9EA0", "#1E90FF", "#FF69B4", "#8A2BE2", "#00FF7F"
     };
 
-    private static string ResolveUserColor(string userId, string userName, string? colorFromTwitch)
+    private static string ResolveUserColor(string? userName, string? colorFromTwitch)
     {
         if (!string.IsNullOrWhiteSpace(colorFromTwitch))
             return colorFromTwitch;
-        
-        string seed = !string.IsNullOrWhiteSpace(userId)
-            ? userId
-            : userName.ToLowerInvariant();
-        int hash = 0;
-        foreach (char c in seed)
+        var seed = string.IsNullOrWhiteSpace(userName)
+            ? "anonymous"
+            : userName.Trim().ToLowerInvariant();
+        unchecked
         {
-            hash = (hash << 5) - hash + c;
+            int hash = 5381;
+            foreach (char c in seed)
+            {
+                hash = ((hash << 5) + hash) ^ c;
+            }
+            int index = Math.Abs(hash) % TwitchDefaultColors.Length;
+            return TwitchDefaultColors[index];
         }
-       
-        int index = (hash & 0x7FFFFFFF) % TwitchDefaultColors.Length;
-
-        return TwitchDefaultColors[index];
     }
 }
