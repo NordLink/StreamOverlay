@@ -1,0 +1,147 @@
+﻿#world {
+    position: relative;
+    width: 90vw;
+    height: 400px;
+    background-color: rgb(0,0,0, 0.1);
+    border-bottom: 6px solid #80b5f0;
+    margin-top: 20px;
+    box-sizing: unset;
+}
+
+.platform {
+    position: absolute;
+    background-color: #216cc0;
+    border-top: 4px solid #80b5f0;
+    border-radius: 4px;
+    box-shadow: 0 4px 6px rgba(0,0,0,0.3);
+}
+
+.character-container {
+    position: absolute;
+    width: 80px;
+    height: 80px;
+    will-change: transform;
+    transition: none !important;        
+}
+
+.svg-char {
+    width: 100%;
+    height: 100%;
+    overflow: visible !important;
+}
+
+.nickname, .life-bar-container, .bubble {
+    position: absolute;
+    left: 50%;
+    transform: translateX(-50%);
+    pointer-events: none;
+}
+
+.nickname {
+    top: -46px;
+    font-weight: 800;
+    font-size: 18px;
+    white-space: nowrap;
+    text-shadow: 1px 1px 0 #000, -1px -1px 0 #000, 1px -1px 0 #000, -1px 1px 0 #000;
+    z-index: 10;
+}
+
+.life-bar-container {
+    top: -18px;
+    width: 60px;
+    height: 8px;
+    background: rgba(0, 0, 0, 0.5);
+    border-radius: 3px;
+    overflow: hidden;
+    border: 1px solid #000;
+}
+
+.life-bar-fill {
+    height: 100%;
+    width: 100%;
+    background: #2ecc71;
+    transition: width 0.1s linear, background-color 0.5s;
+}
+
+.bubble {
+    bottom: 130px;
+    left: 50%;
+    transform: translateX(-50%);
+    position: absolute;
+    background: white;
+    color: #333;
+    padding: 8px 12px;
+    border-radius: 12px;
+    font-size: 16px;
+    font-weight: bold;
+    display: flex;
+    flex-direction: column;
+    justify-content: flex-end;
+    min-width: 40px;
+    max-width: 400px; 
+    width: max-content;
+    white-space: normal;
+    word-wrap: break-word;
+    box-shadow: 0 4px 8px rgba(0,0,0,0.2);
+    transition: opacity 0.5s ease;
+    z-index: 20;
+    pointer-events: none;
+}
+    .bubble::after {
+        content: '';
+        position: absolute;
+        bottom: -8px; 
+        left: 50%;
+        transform: translateX(-50%);
+        border-left: 8px solid transparent;
+        border-right: 8px solid transparent;
+        border-top: 8px solid white;
+    }
+
+
+.Idle #Shell, .Idle #Head, .Idle #Belly, .Idle #Mask,
+.Walking #LegLeft, .Walking #LegRight, .Walking #HandLeft, .Walking #HandRight {
+    will-change: transform;
+}
+
+@keyframes idleBreath {
+    0%, 100% {
+        transform: translateY(0);
+    }
+
+    50% {
+        transform: translateY(-4px);
+    }
+}
+
+.Idle {
+    #Shell, #Head, #Belly, #HandLeft, #HandRight, #Mask {
+        animation: idleBreath 1.2s ease-in-out infinite;
+    }
+}
+
+@keyframes swing {
+    0%, 100% {
+        transform: rotate(-18deg);
+    }
+
+    50% {
+        transform: rotate(18deg);
+    }
+}
+
+.Walking {
+    #LegLeft, #LegRight, #HandLeft, #HandRight {
+        transform-box: fill-box;
+        transform-origin: 50% 0%;
+        animation: swing 0.35s ease-in-out infinite;
+    }
+    #HandLeft, #LegRight {
+        animation-delay: -0.175s;
+    }
+}
+
+.Jumping .svg-char {
+    transform: scaleY(1.1);
+    transition: transform 0.2s;
+}
