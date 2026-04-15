@@ -39,7 +39,7 @@ import { resolveMessageColor, fallbackUserColor } from './colorUtils.js';
         const items = Object.entries(state.channels)
             .filter(([_, name]) => name)
             .map(([_, name]) => name);
-        channelNameEl.textContent = items.length ? items.join(" / ") : "—";
+        channelNameEl.textContent = items.length ? items.join(" / ") : "OneGoldShow";
     }
     function renderViewers() {
         const twitch = Number(state.viewers.twitch || 0);
@@ -77,11 +77,11 @@ import { resolveMessageColor, fallbackUserColor } from './colorUtils.js';
         const badge = createPlatformBadge(platform);
         const user = document.createElement("span");
         user.className = "user";
-        user.textContent = payload?.user || "Anonymous";
+        user.textContent = (payload?.user || "Anonymous") + ":"; 
         user.style.color = userColor;
         const msg = document.createElement("span");
         msg.className = "msg";
-        msg.textContent = ": " + (payload?.message || "");
+        msg.textContent = (payload?.message || "");
         line.appendChild(badge);
         line.appendChild(user);
         line.appendChild(msg);

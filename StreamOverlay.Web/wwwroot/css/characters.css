@@ -1,19 +1,20 @@
 ﻿#world {
-    position: relative;
-    width: 90vw;
+    position: absolute;
+    bottom: 50px;
+    left: 0;
+    width: var(--appwidth);
     height: 400px;
     background-color: rgb(0,0,0, 0.1);
-    border-bottom: 6px solid #80b5f0;
-    margin-top: 20px;
+    /*    border-bottom: 6px solid #80b5f0;*/
     box-sizing: unset;
 }
 
 .platform {
     position: absolute;
-    background-color: #216cc0;
+/*    background-color: #216cc0;
     border-top: 4px solid #80b5f0;
     border-radius: 4px;
-    box-shadow: 0 4px 6px rgba(0,0,0,0.3);
+    box-shadow: 0 4px 6px rgba(0,0,0,0.3);*/
 }
 
 .character-container {
@@ -40,7 +41,7 @@
 .nickname {
     top: -46px;
     font-weight: 800;
-    font-size: 18px;
+    font-size: 20px;
     white-space: nowrap;
     text-shadow: 1px 1px 0 #000, -1px -1px 0 #000, 1px -1px 0 #000, -1px 1px 0 #000;
     z-index: 10;
@@ -72,7 +73,7 @@
     color: #333;
     padding: 8px 12px;
     border-radius: 12px;
-    font-size: 16px;
+    font-size: 20px;
     font-weight: bold;
     display: flex;
     flex-direction: column;
@@ -110,7 +111,7 @@
     }
 
     50% {
-        transform: translateY(-4px);
+        transform: translateY(-10px);
     }
 }
 
@@ -142,6 +143,6 @@
 }
 
 .Jumping .svg-char {
-    transform: scaleY(1.1);
-    transition: transform 0.2s;
+/*    transform: scaleY(1.1);
+    transition: transform 0.2s;*/
 }

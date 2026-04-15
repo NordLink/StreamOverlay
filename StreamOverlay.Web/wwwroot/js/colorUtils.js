@@ -16,6 +16,5 @@ export function fallbackUserColor(name) {
 }
 
 export function resolveMessageColor(payload) {
-    console.log('Ура, функция цвета отработала!')
     return payload?.color || fallbackUserColor(payload?.user || "anonymous");
 }

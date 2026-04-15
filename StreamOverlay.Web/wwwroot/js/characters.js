@@ -10,17 +10,19 @@ const config = {
     CHAR_SIZE: 80, // в пикселях (должно совпадать с размерами персонажа в character.css)
     WORLD_HEIGHT: 400,  // в пикселях (должно совпадать с размерами #World в character.css)
     MAX_LIFETIME: 180000,
-    MAX_CHARACTERS: 5,
+    MAX_CHARACTERS: 20,
     MAX_MESSAGE_LENGTH: 160
 };
 
 // Настройки для платформ (кол-во/расположение): отступ слева и ширина платформы в %, отспуп сверху и высотка платформы в px
 const platformSettings = [
-    { left: 30, top: 320, width: 30, height: 20 },
-    { left: 60, top: 260, width: 30, height: 20 },
-    { left: 30, top: 180, width: 30, height: 20 },
-    { left: 86, top: 180, width: 10, height: 20 },
-    { left: 5, top: 100, width: 25, height: 20 }
+    { left: 87, top: 310, width: 13, height: 20 }, // камень справа
+    { left: 60.5, top: 260, width: 2.5, height: 20 }, // урна справа
+    { left: 49.5, top: 252, width: 6.5, height: 20 }, // спинка лавочки
+    { left: 49.3, top: 325, width: 7, height: 20 }, // лавочка справа
+    { left: 18.5, top: 252, width: 6.5, height: 20 }, // спинка лавочки слева
+    { left: 18.3, top: 325, width: 7, height: 20 }, // лавочка слева
+    { left: 12, top: 260, width: 2.5, height: 20 } // урна слева
   
 ];
 
