@@ -1,4 +1,5 @@
 ﻿import { resolveMessageColor } from './colorUtils.js';
+import { formatMessageWithEmotes } from './messageUtils.js';
 
 const world = document.getElementById('world');
 
@@ -9,7 +10,7 @@ const config = {
     WALK_SPEED: 2,
     CHAR_SIZE: 80, // в пикселях (должно совпадать с размерами персонажа в character.css)
     WORLD_HEIGHT: 400,  // в пикселях (должно совпадать с размерами #World в character.css)
-    MAX_LIFETIME: 180000,
+    MAX_LIFETIME: 600, // время жизни персонажа в секундах
     MAX_CHARACTERS: 20,
     MAX_MESSAGE_LENGTH: 160
 };
@@ -49,13 +50,16 @@ function truncateMessage(message, maxLength = config.MAX_MESSAGE_LENGTH) {
     return message;
 }
 
-function updateCharacterBubble(char, message) {
+function updateCharacterBubble(char, message, emotes) {
     if (!message) return;
     clearTimeout(char.bubbleTimeout);
 
     const truncatedMessage = truncateMessage(message);
 
-    char.bubbleEl.innerText = truncatedMessage;
+    const formattedMessage = formatMessageWithEmotes(truncatedMessage, emotes);
+
+    char.bubbleEl.innerHTML = formattedMessage;
+
     char.bubbleEl.style.opacity = '1';
     char.bubbleEl.style.display = 'block';
     char.bubbleTimeout = setTimeout(() => {
@@ -76,7 +80,7 @@ function createPlatforms(pData) {
     });
 }
 
-function CreateCharacter(key, color, nickname, message) {
+function CreateCharacter(key, color, nickname, message, emotes) {
     // Удаляем персонажа у которого меньше всего хп, если превышен лимит
     if (characters.size >= config.MAX_CHARACTERS) {
         let oldestKey = null;
@@ -110,7 +114,7 @@ function CreateCharacter(key, color, nickname, message) {
         isGrounded: true,
         element: null,
         actionTimer: 1000,
-        dieTime: spawnTime + config.MAX_LIFETIME,
+        dieTime: spawnTime + (config.MAX_LIFETIME * 1000),
         bubbleTimeout: null
     };
     const bodyColor = turtleColors[Math.floor(Math.random() * turtleColors.length)];
@@ -387,7 +391,7 @@ function CreateCharacter(key, color, nickname, message) {
     charObj.element = container;
     characters.set(key, charObj);
 
-    updateCharacterBubble(charObj, message);
+    updateCharacterBubble(charObj, message, emotes);
 }
 
 export function spawnCharacterFromMessage(payload) {
@@ -401,7 +405,7 @@ export function spawnCharacterFromMessage(payload) {
     if (characters.has(key)) {
         const char = characters.get(key);
         char.dieTime = Date.now() + config.MAX_LIFETIME;
-        updateCharacterBubble(char, message);
+        updateCharacterBubble(char, message, payload.emotes); 
 
         // Добавляем прыжок при получении сообщения (заменю потом эмоцию)
         //if (char.isGrounded) {
@@ -409,7 +413,7 @@ export function spawnCharacterFromMessage(payload) {
         //    char.isGrounded = false;
         //}
     } else {
-        CreateCharacter(key, color, userName, message);
+        CreateCharacter(key, color, userName, message, payload.emotes);
     }
 }
 
@@ -420,7 +424,7 @@ function animationLoop() {
 
     for (let [key, char] of characters) {
         const timeLeft = char.dieTime - now;
-        const percent = Math.max(0, (timeLeft / config.MAX_LIFETIME) * 100);
+        const percent = Math.max(0, (timeLeft / (config.MAX_LIFETIME * 1000)) * 100);
 
         if (timeLeft <= 0) {
             char.element.style.transition = 'opacity 0.5s, transform 0.5s';
