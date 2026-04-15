@@ -58,6 +58,34 @@ public class VkChatPollingService : BackgroundService
         }
     }
 
+    private static (string Text, List<OverlayEmoteDto> Emotes) ProcessMessageParts(List<VkPart>? parts)
+    {
+        var textChunks = new List<string>();
+        var emotes = new List<OverlayEmoteDto>();
+        if (parts != null)
+        {
+            foreach (var part in parts)
+            {
+                if (!string.IsNullOrWhiteSpace(part.Text?.Content))
+                {
+                    textChunks.Add(part.Text.Content);
+                }
+                else if (part.Smile != null)
+                {
+                    var url = part.Smile.LargeUrl ?? part.Smile.MediumUrl ?? part.Smile.SmallUrl ?? "";
+                    emotes.Add(new OverlayEmoteDto(part.Smile.Id ?? "0", part.Smile.Name ?? "smile", url));
+
+                    textChunks.Add(" " + part.Smile.Name + " ");
+                }
+                else if (part.Mention?.Nick != null)
+                {
+                    textChunks.Add(" @" + part.Mention.Nick + " ");
+                }
+            }
+        }
+        return (string.Join(" ", textChunks.Where(c => !string.IsNullOrWhiteSpace(c))), emotes);
+    }
+
     private async Task PollMessagesAsync(CancellationToken ct)
     {
         var response = await _vkClient.GetMessagesAsync(50, ct);
@@ -87,20 +115,17 @@ public class VkChatPollingService : BackgroundService
         {
             if (message.Id <= 0 || _seenMessageIds.Contains(message.Id))
                 continue;
-
             var user = string.IsNullOrWhiteSpace(message.Author?.Nick)
                 ? "VK User"
                 : message.Author!.Nick!;
-
-            var text = BuildMessageText(message.Parts);
-            if (string.IsNullOrWhiteSpace(text))
+            var (text, emoteList) = ProcessMessageParts(message.Parts);
+            if (string.IsNullOrWhiteSpace(text) && emoteList.Count == 0)
                 text = "[empty]";
-
             var color = GetColorFromPalette(message.Author?.NickColor);
+       
             await _broadcast.SendChatMessageAsync(
-                new OverlayChatMessageDto("vk", user, text, color),
+                new OverlayChatMessageDto("vk", user, text, color, emoteList),
                 ct);
-
             RememberId(message.Id);
         }
     }
@@ -114,36 +139,6 @@ public class VkChatPollingService : BackgroundService
             var oldest = _seenOrder.Dequeue();
             _seenMessageIds.Remove(oldest);
         }
-    }
-
-    private static string BuildMessageText(List<VkPart>? parts)
-    {
-        if (parts is null || parts.Count == 0)
-            return string.Empty;
-        var chunks = new List<string>();
-        foreach (var part in parts)
-        {
-            if (!string.IsNullOrWhiteSpace(part.Text?.Content))
-            {
-                chunks.Add(part.Text.Content);
-                continue;
-            }
-            if (!string.IsNullOrWhiteSpace(part.Link?.Content))
-            {
-                chunks.Add(part.Link.Content);
-                continue;
-            }
-            if (!string.IsNullOrWhiteSpace(part.Mention?.Nick))
-            {
-                chunks.Add("@" + part.Mention.Nick);
-                continue;
-            }
-            if (!string.IsNullOrWhiteSpace(part.Smile?.Name))
-            {
-                chunks.Add(":" + part.Smile.Name + ":");
-            }
-        }
-        return string.Concat(chunks);
     }
 
     private static string? GetColorFromPalette(int? colorIndex)

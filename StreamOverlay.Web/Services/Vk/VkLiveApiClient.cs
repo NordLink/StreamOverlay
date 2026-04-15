@@ -3,7 +3,6 @@ using Microsoft.Extensions.Options;
 using System.Net.Http.Headers;
 using System.Text;
 using System.Text.Json;
-using TwitchLib.Api.Core.Common;
 public interface IVkLiveApiClient
 {
     Task<VkMessagesResponse?> GetMessagesAsync(int limit, CancellationToken ct);
@@ -44,6 +43,7 @@ public class VkLiveApiClient : IVkLiveApiClient
             return null;
         }
         var json = await response.Content.ReadAsStringAsync(ct);
+
         return Helper.Deserialize<VkMessagesResponse>(json);
     }
 

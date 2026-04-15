@@ -31,7 +31,7 @@ import { resolveMessageColor, fallbackUserColor } from './colorUtils.js';
     };
   
 
-    let platformsData = [];//
+    let platformsData = [];
     
     let lastFrameTime = performance.now();
 
@@ -70,8 +70,6 @@ import { resolveMessageColor, fallbackUserColor } from './colorUtils.js';
         return badge;
     }
 
-
-    //////////////////////////////////
     function formatMessageWithEmotes(message, emotes) {
         if (!emotes || emotes.length === 0) {
             return escapeHtml(message);
@@ -139,9 +137,6 @@ import { resolveMessageColor, fallbackUserColor } from './colorUtils.js';
             behavior: "smooth"
         });
     }
-
-
-    
   
     const connection = new signalR.HubConnectionBuilder()
         .withUrl("/chat")
