@@ -30,18 +30,31 @@ public class TwitchChatService : BackgroundService
         _client.Initialize(credentials, _options.WatchChannel);
         _client.OnMessageReceived += async (_, e) =>
         {
+
+            var emoteList = new List<OverlayEmoteDto>();
+            if (e.ChatMessage.EmoteSet != null && e.ChatMessage.EmoteSet.Emotes.Count > 0)
+            {
+                foreach (var emote in e.ChatMessage.EmoteSet.Emotes)
+                {
+                    var url = $"https://static-cdn.jtvnw.net/emoticons/v2/{emote.Id}/default/dark/3.0";
+                    emoteList.Add(new OverlayEmoteDto(emote.Id, emote.Name, url));
+                }
+            }
+
             try
             {
                 var userName = string.IsNullOrWhiteSpace(e.ChatMessage.DisplayName)
                     ? e.ChatMessage.Username
                     : e.ChatMessage.DisplayName;
                 var userColor = ResolveUserColor(e.ChatMessage.Username, e.ChatMessage.HexColor);
+    
                 await _broadcast.SendChatMessageAsync(
                     new OverlayChatMessageDto(
                         "twitch",
                         userName,
                         e.ChatMessage.Message,
-                        userColor),
+                        userColor,
+                        emoteList),
                     stoppingToken);
             }
             catch (Exception ex)

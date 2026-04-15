@@ -40,11 +40,11 @@ builder.Services.Configure<VkLiveOptions>(options =>
 
 builder.Services.AddSingleton<IOverlayBroadcastService, SignalROverlayBroadcastService>();
 builder.Services.AddSingleton<TwitchTokenProvider>();
-builder.Services.AddSingleton<IVkLiveApiClient, VkLiveApiClient>();
+//builder.Services.AddSingleton<IVkLiveApiClient, VkLiveApiClient>();
 builder.Services.AddHostedService<TwitchChannelInfoService>();
 builder.Services.AddHostedService<TwitchChatService>();
-builder.Services.AddHostedService<VkChatPollingService>();
-builder.Services.AddHostedService<VkViewerPollingService>();
+//builder.Services.AddHostedService<VkChatPollingService>();
+//builder.Services.AddHostedService<VkViewerPollingService>();
 
 var app = builder.Build();
 

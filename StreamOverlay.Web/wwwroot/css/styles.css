@@ -259,7 +259,16 @@ body {
 
 .msg {
     display: inline;
+    word-wrap: break-word; /* Чтобы длинные сообщения переносились */
 }
+
+.chat-emote {
+    height: 40px;
+    vertical-align: middle;
+    margin: 0 2px;
+    display: inline-block;
+}
+
 .viewers-info {
     width: 100%;
     display: flex;
