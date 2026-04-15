@@ -10,7 +10,7 @@ const config = {
     WALK_SPEED: 2,
     CHAR_SIZE: 80, // в пикселях (должно совпадать с размерами персонажа в character.css)
     WORLD_HEIGHT: 400,  // в пикселях (должно совпадать с размерами #World в character.css)
-    MAX_LIFETIME: 600, // время жизни персонажа в секундах
+    MAX_LIFETIME: 720000, // 12 мин
     MAX_CHARACTERS: 20,
     MAX_MESSAGE_LENGTH: 160
 };
@@ -114,7 +114,7 @@ function CreateCharacter(key, color, nickname, message, emotes) {
         isGrounded: true,
         element: null,
         actionTimer: 1000,
-        dieTime: spawnTime + (config.MAX_LIFETIME * 1000),
+        dieTime: spawnTime + config.MAX_LIFETIME,
         bubbleTimeout: null
     };
     const bodyColor = turtleColors[Math.floor(Math.random() * turtleColors.length)];
@@ -424,7 +424,7 @@ function animationLoop() {
 
     for (let [key, char] of characters) {
         const timeLeft = char.dieTime - now;
-        const percent = Math.max(0, (timeLeft / (config.MAX_LIFETIME * 1000)) * 100);
+        const percent = Math.max(0, (timeLeft / config.MAX_LIFETIME) * 100);
 
         if (timeLeft <= 0) {
             char.element.style.transition = 'opacity 0.5s, transform 0.5s';
