@@ -123,11 +123,6 @@ body {
     z-index: 2; 
 }
 
-.status-block {
-    position: fixed;
-    top: 50px;
-    left: 3%;
-}
 .chat-wrapper {
     position: fixed;
     display: flex;

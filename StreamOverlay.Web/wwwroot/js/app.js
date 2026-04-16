@@ -8,7 +8,6 @@ import { formatMessageWithEmotes } from './messageUtils.js';
     const viewerCountEl = document.getElementById("viewerCount");
     const twitchViewersEl = document.getElementById("twitchViewers");
     const vkViewersEl = document.getElementById("vkViewers");
-    const liveStatusEl = document.getElementById("liveStatus");
 
     const state = {
         channels: {},
@@ -49,19 +48,15 @@ import { formatMessageWithEmotes } from './messageUtils.js';
         vkViewersEl.textContent = String(vk);
         viewerCountEl.textContent = String(twitch + vk);
     }
-    function renderStatus() {
-        let statusText = "";
-        let statusColor = "#ffffff";
+    function statusLogger() {
+        let statusText = ""
         if (state.connection === "CONNECTING" || state.connection === "RECONNECTING") {
             statusText = state.connection;
-            statusColor = "#fbbf24";
         } else {
             const anyLive = Object.values(state.live).some(x => x === true);
             statusText = anyLive ? "ONLINE" : "OFFLINE";
-            statusColor = anyLive ? "#00ffad" : "#ef4444";
         }
-        liveStatusEl.textContent = statusText;
-        liveStatusEl.style.color = statusColor;
+        console.log("ConnectionStatus: " + statusText)
     }
     function createPlatformBadge(platform) {
         const badge = document.createElement("span");
@@ -129,7 +124,7 @@ import { formatMessageWithEmotes } from './messageUtils.js';
         state.viewers[platform] = Number(payload?.count ?? 0);
         state.live[platform] = Boolean(payload?.isLive);
         renderViewers();
-        renderStatus();
+        statusLogger();
     });
 
     connection.on("chatMessage", (payload) => {
@@ -141,29 +136,29 @@ import { formatMessageWithEmotes } from './messageUtils.js';
         try {
             await connection.start();
             state.connection = "CONNECTED";
-            renderStatus();
+            statusLogger();
         } catch (e) {
             state.connection = "RECONNECTING";
-            renderStatus();
+            statusLogger();
             setTimeout(start, 5000);
         }
     }
     connection.onreconnecting(() => {
         state.connection = "RECONNECTING";
-        renderStatus();
+        statusLogger();
     });
     connection.onreconnected(() => {
         state.connection = "CONNECTED";
-        renderStatus();
+        statusLogger();
     });
     connection.onclose(() => {
         state.connection = "DISCONNECTED";
-        renderStatus();
+        statusLogger();
     });
 
     initCharacterWorld();
     renderChannels();
     renderViewers();
-    renderStatus();
+    statusLogger();
     start();
 })();
