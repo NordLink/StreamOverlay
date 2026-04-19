@@ -119,7 +119,7 @@ body {
     position: relative;
     width: var(--appwidth);
     height: var(--appheight);
-    background: url('/overlay_bg.png') no-repeat center center / cover;
+    background: url('/img/overlay_bg.png') no-repeat center center / cover;
     z-index: 2; 
 }
 

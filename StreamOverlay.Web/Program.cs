@@ -39,6 +39,7 @@ builder.Services.Configure<VkLiveOptions>(options =>
 });
 
 builder.Services.AddSingleton<IOverlayBroadcastService, SignalROverlayBroadcastService>();
+builder.Services.AddSingleton<OverlayStateService>();
 builder.Services.AddSingleton<TwitchTokenProvider>();
 builder.Services.AddSingleton<IVkLiveApiClient, VkLiveApiClient>();
 builder.Services.AddHostedService<TwitchChannelInfoService>();
@@ -49,6 +50,11 @@ builder.Services.AddHostedService<VkViewerPollingService>();
 var app = builder.Build();
 
 app.UseStaticFiles();
-app.MapHub<ChatHub>("/chat");
+app.MapHub<ChatHub>("/chat-hub");
+
+app.MapGet("/", () => Results.File("index.html", "text/html"));
+app.MapGet("/overlay", () => Results.File("overlay.html", "text/html"));
+app.MapGet("/chat", () => Results.File("chat.html", "text/html"));
+
 app.MapFallbackToFile("index.html");
 app.Run();

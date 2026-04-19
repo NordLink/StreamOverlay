@@ -34,6 +34,7 @@ let platformsData = [];
 let characters = new Map();
 
 function getComputedPlatforms() {
+    if (!world) return [];
     const worldWidth = world.offsetWidth;
     return platformsData.map(p => ({
         left: (p.leftPercent / 100) * worldWidth,
@@ -68,6 +69,7 @@ function updateCharacterBubble(char, message, emotes) {
 }
 
 function createPlatforms(pData) {
+    if (!world) return;
     pData.forEach(p => {
         const plat = document.createElement('div');
         plat.className = 'platform';
@@ -418,6 +420,7 @@ export function spawnCharacterFromMessage(payload) {
 }
 
 function animationLoop() {
+    if (!world) return;
     const now = Date.now();
     const worldWidth = world.offsetWidth;
     const currentPlatforms = getComputedPlatforms();
@@ -489,6 +492,7 @@ function animationLoop() {
 }
 
 export function initCharacterWorld() {
+    if (!world) return;
     createPlatforms(platformSettings);
     requestAnimationFrame(animationLoop);
 }

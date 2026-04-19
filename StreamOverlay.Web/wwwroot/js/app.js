@@ -36,12 +36,14 @@ import { formatMessageWithEmotes } from './messageUtils.js';
     let lastFrameTime = performance.now();
 
     function renderChannels() {
+        if (!channelNameEl) return;
         const items = Object.entries(state.channels)
             .filter(([_, name]) => name)
             .map(([_, name]) => name);
         channelNameEl.textContent = items.length ? items.join(" / ") : "OneGoldShow";
     }
     function renderViewers() {
+        if (!twitchViewersEl || !vkViewersEl) return;
         const twitch = Number(state.viewers.twitch || 0);
         const vk = Number(state.viewers.vk || 0);
         twitchViewersEl.textContent = String(twitch);
@@ -108,10 +110,11 @@ import { formatMessageWithEmotes } from './messageUtils.js';
     }
   
     const connection = new signalR.HubConnectionBuilder()
-        .withUrl("/chat")
+        .withUrl("/chat-hub")
         .withAutomaticReconnect()
         .build();
     connection.on("channelInfo", (payload) => {
+        console.log("channelInfo", payload)
         const platform = (payload?.platform || "").toLowerCase();
         if (!platform) return;
         state.channels[platform] = payload?.displayName || payload?.login || "—";

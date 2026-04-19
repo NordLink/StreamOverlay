@@ -8,12 +8,15 @@ public interface IOverlayBroadcastService
 public class SignalROverlayBroadcastService : IOverlayBroadcastService
 {
     private readonly IHubContext<ChatHub> _hub;
-    public SignalROverlayBroadcastService(IHubContext<ChatHub> hub)
+    private readonly OverlayStateService _stateService;
+    public SignalROverlayBroadcastService(IHubContext<ChatHub> hub, OverlayStateService stateService)
     {
         _hub = hub;
+        _stateService = stateService;
     }
     public Task SendChannelInfoAsync(OverlayChannelInfoDto dto, CancellationToken ct)
     {
+        _stateService.SetChannelInfo(dto); // Сохранить в общий сервис
         return _hub.Clients.All.SendAsync("channelInfo", new
         {
             platform = dto.Platform,
@@ -23,6 +26,7 @@ public class SignalROverlayBroadcastService : IOverlayBroadcastService
     }
     public Task SendViewerCountAsync(OverlayViewerCountDto dto, CancellationToken ct)
     {
+        _stateService.SetViewerCount(dto);
         return _hub.Clients.All.SendAsync("viewerCount", new
         {
             platform = dto.Platform,

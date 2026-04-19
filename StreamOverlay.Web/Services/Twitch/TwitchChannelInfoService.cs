@@ -50,6 +50,7 @@ public class TwitchChannelInfoService : BackgroundService
     private async Task PushChannelInfoAsync(CancellationToken ct)
     {
         var token = await _tokenProvider.GetTokenAsync(ct);
+
         if (string.IsNullOrWhiteSpace(token))
             return;
         try
@@ -74,6 +75,7 @@ public class TwitchChannelInfoService : BackgroundService
                 return;
             }
             var displayName = data[0].GetProperty("display_name").GetString() ?? _options.WatchChannel;
+
             await _broadcast.SendChannelInfoAsync(
                 new OverlayChannelInfoDto("twitch", _options.WatchChannel, displayName),
                 ct);
