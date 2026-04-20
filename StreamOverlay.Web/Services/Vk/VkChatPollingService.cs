@@ -62,27 +62,44 @@ public class VkChatPollingService : BackgroundService
     {
         var textChunks = new List<string>();
         var emotes = new List<OverlayEmoteDto>();
+
         if (parts != null)
         {
             foreach (var part in parts)
             {
+                // 1. Обычный текст
                 if (!string.IsNullOrWhiteSpace(part.Text?.Content))
                 {
                     textChunks.Add(part.Text.Content);
                 }
+                // 2. Эмодзи
                 else if (part.Smile != null)
                 {
                     var url = part.Smile.LargeUrl ?? part.Smile.MediumUrl ?? part.Smile.SmallUrl ?? "";
                     emotes.Add(new OverlayEmoteDto(part.Smile.Id ?? "0", part.Smile.Name ?? "smile", url));
-
                     textChunks.Add(" " + part.Smile.Name + " ");
                 }
+                // 3. Упоминания
                 else if (part.Mention?.Nick != null)
                 {
                     textChunks.Add(" @" + part.Mention.Nick + " ");
                 }
+                // 4. ССЫЛКИ (Исправление здесь)
+                else if (part.Link != null)
+                {
+                    // Используем Content, если он есть, иначе URL
+                    var linkContent = !string.IsNullOrWhiteSpace(part.Link.Content)
+                        ? part.Link.Content
+                        : part.Link.Url;
+
+                    if (!string.IsNullOrWhiteSpace(linkContent))
+                    {
+                        textChunks.Add(linkContent);
+                    }
+                }
             }
         }
+
         return (string.Join(" ", textChunks.Where(c => !string.IsNullOrWhiteSpace(c))), emotes);
     }
 
@@ -90,6 +107,7 @@ public class VkChatPollingService : BackgroundService
     {
         var response = await _vkClient.GetMessagesAsync(50, ct);
         var messages = response?.Data?.ChatMessages;
+      
         if (messages is null || messages.Count == 0)
             return;
 

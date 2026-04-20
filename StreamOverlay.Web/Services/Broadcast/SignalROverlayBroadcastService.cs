@@ -16,7 +16,7 @@ public class SignalROverlayBroadcastService : IOverlayBroadcastService
     }
     public Task SendChannelInfoAsync(OverlayChannelInfoDto dto, CancellationToken ct)
     {
-        _stateService.SetChannelInfo(dto); // Сохранить в общий сервис
+        _stateService.SetChannelInfo(dto);
         return _hub.Clients.All.SendAsync("channelInfo", new
         {
             platform = dto.Platform,

@@ -1,140 +1,144 @@
-﻿import { resolveMessageColor } from './colorUtils.js';
-import { formatMessageWithEmotes } from './messageUtils.js';
-
-const world = document.getElementById('world');
-
-// Настройки мира и физики
-const config = {
-    GRAVITY: 0.5,
-    JUMP_POWER: -10,
-    WALK_SPEED: 2,
-    CHAR_SIZE: 80, // в пикселях (должно совпадать с размерами персонажа в character.css)
-    WORLD_HEIGHT: 400,  // в пикселях (должно совпадать с размерами #World в character.css)
-    MAX_LIFETIME: 720000, // 12 мин
-    MAX_CHARACTERS: 20,
-    MAX_MESSAGE_LENGTH: 160
-};
-
-// Настройки для платформ (кол-во/расположение): отступ слева и ширина платформы в %, отспуп сверху и высотка платформы в px
-const platformSettings = [
-    { left: 87, top: 310, width: 13, height: 20 }, // камень справа
-    { left: 60.5, top: 260, width: 2.5, height: 20 }, // урна справа
-    { left: 49.5, top: 252, width: 6.5, height: 20 }, // спинка лавочки
-    { left: 49.3, top: 325, width: 7, height: 20 }, // лавочка справа
-    { left: 18.5, top: 252, width: 6.5, height: 20 }, // спинка лавочки слева
-    { left: 18.3, top: 325, width: 7, height: 20 }, // лавочка слева
-    { left: 12, top: 260, width: 2.5, height: 20 } // урна слева
-  
-];
-
-// Цвета черепашек
-const turtleColors = ['#89af41', '#76a032', '#a3c35d', '#6b8e23', '#556b2f'];
-
-let platformsData = [];
-let characters = new Map();
-
-function getComputedPlatforms() {
-    if (!world) return [];
-    const worldWidth = world.offsetWidth;
-    return platformsData.map(p => ({
-        left: (p.leftPercent / 100) * worldWidth,
-        right: ((p.leftPercent + p.widthPercent) / 100) * worldWidth,
-        top: p.top,
-        bottom: p.top + p.height
-    }));
-}
-
-function truncateMessage(message, maxLength = config.MAX_MESSAGE_LENGTH) {
-    if (message.length > maxLength) {
-        return message.substring(0, maxLength) + '...';
+﻿import { resolveMessageColor } from '../utils/colorUtils.js';
+import { formatMessageWithEmotes } from '../utils/messageUtils.js';
+export class Characters {
+    constructor(elementId) {
+        this.world = document.getElementById(elementId);
+        this.characters = new Map();
+        this.platformsData = [];
+        // Настройки мира и физики
+        this.config = {
+            GRAVITY: 0.5,
+            JUMP_POWER: -10,
+            WALK_SPEED: 2,
+            CHAR_SIZE: 80,
+            WORLD_HEIGHT: 400,
+            MAX_LIFETIME: 720000, // 12 мин
+            MAX_CHARACTERS: 20,
+            MAX_MESSAGE_LENGTH: 160
+        };
+        // Настройки платформ
+        this.platformSettings = [
+            { left: 87, top: 310, width: 13, height: 20 },
+            { left: 60.5, top: 260, width: 2.5, height: 20 },
+            { left: 49.5, top: 252, width: 6.5, height: 20 },
+            { left: 49.3, top: 325, width: 7, height: 20 },
+            { left: 18.5, top: 252, width: 6.5, height: 20 },
+            { left: 18.3, top: 325, width: 7, height: 20 },
+            { left: 12, top: 260, width: 2.5, height: 20 }
+        ];
+        this.turtleColors = ['#89af41', '#76a032', '#a3c35d', '#6b8e23', '#556b2f'];
+        // Привязываем контекст для requestAnimationFrame
+        this._animationLoop = this._animationLoop.bind(this);
     }
-    return message;
-}
-
-function updateCharacterBubble(char, message, emotes) {
-    if (!message) return;
-    clearTimeout(char.bubbleTimeout);
-
-    const truncatedMessage = truncateMessage(message);
-
-    const formattedMessage = formatMessageWithEmotes(truncatedMessage, emotes);
-
-    char.bubbleEl.innerHTML = formattedMessage;
-
-    char.bubbleEl.style.opacity = '1';
-    char.bubbleEl.style.display = 'block';
-    char.bubbleTimeout = setTimeout(() => {
-        char.bubbleEl.style.opacity = '0';
-    }, 7000);
-}
-
-function createPlatforms(pData) {
-    if (!world) return;
-    pData.forEach(p => {
-        const plat = document.createElement('div');
-        plat.className = 'platform';
-        plat.style.left = p.left + '%';
-        plat.style.top = p.top + 'px';
-        plat.style.width = p.width + '%';
-        plat.style.height = p.height + 'px';
-        world.appendChild(plat);
-        platformsData.push({ leftPercent: p.left, top: p.top, widthPercent: p.width, height: p.height });
-    });
-}
-
-function CreateCharacter(key, color, nickname, message, emotes) {
-    // Удаляем персонажа у которого меньше всего хп, если превышен лимит
-    if (characters.size >= config.MAX_CHARACTERS) {
-        let oldestKey = null;
-        let minDieTime = Infinity;
-
-        characters.forEach((char, k) => {
-            if (char.dieTime < minDieTime) {
-                minDieTime = char.dieTime;
-                oldestKey = k;
-            }
-        });
-
-        if (oldestKey) {
-            const oldChar = characters.get(oldestKey);
-            oldChar.element.remove();
-            characters.delete(oldestKey);
+    init() {
+        if (!this.world) return;
+        this._createPlatforms(this.platformSettings);
+        requestAnimationFrame(this._animationLoop);
+    }
+    spawnFromMessage(payload) {
+        const platform = (payload?.platform || "unknown").toLowerCase();
+        const userName = payload?.user || "Anonymous";
+        const color = resolveMessageColor(payload);
+        const message = payload?.message || "";
+        const key = `${platform}:${userName.trim().toLowerCase()}`;
+        if (this.characters.has(key)) {
+            const char = this.characters.get(key);
+            char.dieTime = Date.now() + this.config.MAX_LIFETIME;
+            this._updateCharacterBubble(char, message, payload.emotes);
+        } else {
+            this._createCharacter(key, color, userName, message, payload.emotes);
         }
     }
+    _getComputedPlatforms() {
+        if (!this.world) return [];
+        const worldWidth = this.world.offsetWidth;
+        return this.platformsData.map(p => ({
+            left: (p.leftPercent / 100) * worldWidth,
+            right: ((p.leftPercent + p.widthPercent) / 100) * worldWidth,
+            top: p.top,
+            bottom: p.top + p.height
+        }));
+    }
+    _truncateMessage(message) {
+        if (message.length > this.config.MAX_MESSAGE_LENGTH) {
+            return message.substring(0, this.config.MAX_MESSAGE_LENGTH) + '...';
+        }
+        return message;
+    }
+    _updateCharacterBubble(char, message, emotes) {
+        if (!message) return;
+        clearTimeout(char.bubbleTimeout);
 
-    const spawnTime = Date.now();
-    const charObj = {
-        x: Math.random() * (world.offsetWidth - config.CHAR_SIZE),
-        y: config.WORLD_HEIGHT - config.CHAR_SIZE,
-        vx: 0,
-        vy: 0,
-        width: config.CHAR_SIZE,
-        height: config.CHAR_SIZE,
-        state: 'Idle',
-        color: color,
-        nickname: nickname,
-        isGrounded: true,
-        element: null,
-        actionTimer: 1000,
-        dieTime: spawnTime + config.MAX_LIFETIME,
-        bubbleTimeout: null
-    };
-    const bodyColor = turtleColors[Math.floor(Math.random() * turtleColors.length)];
-    const container = document.createElement('div');
-    container.className = 'character-container Idle';
-    container.style.setProperty("--mask-color", color);
-    container.style.setProperty("--turtle-color", bodyColor);
+        const truncatedMessage = this._truncateMessage(message);
+        const formattedMessage = formatMessageWithEmotes(truncatedMessage, emotes);
 
-    // Индикатор жизни
-    const lifeContainer = document.createElement('div');
-    lifeContainer.className = 'life-bar-container';
-    const lifeFill = document.createElement('div');
-    lifeFill.className = 'life-bar-fill';
-    lifeContainer.appendChild(lifeFill);
-    charObj.lifeFill = lifeFill;
-    
-    const svgTemplate = `
-        <svg id="Turtle" class="svg-char" width="300" hight="300" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 496.08 511.25">
+        char.bubbleEl.innerHTML = formattedMessage;
+        char.bubbleEl.style.opacity = '1';
+        char.bubbleEl.style.display = 'block';
+
+        char.bubbleTimeout = setTimeout(() => {
+            char.bubbleEl.style.opacity = '0';
+        }, 7000);
+    }
+    _createPlatforms(pData) {
+        if (!this.world) return;
+        pData.forEach(p => {
+            const plat = document.createElement('div');
+            plat.className = 'platform';
+            plat.style.left = p.left + '%';
+            plat.style.top = p.top + 'px';
+            plat.style.width = p.width + '%';
+            plat.style.height = p.height + 'px';
+            this.world.appendChild(plat);
+            this.platformsData.push({ leftPercent: p.left, top: p.top, widthPercent: p.width, height: p.height });
+        });
+    }
+    _createCharacter(key, color, nickname, message, emotes) {
+        if (this.characters.size >= this.config.MAX_CHARACTERS) {
+            let oldestKey = null;
+            let minDieTime = Infinity;
+            this.characters.forEach((char, k) => {
+                if (char.dieTime < minDieTime) {
+                    minDieTime = char.dieTime;
+                    oldestKey = k;
+                }
+            });
+            if (oldestKey) {
+                const oldChar = this.characters.get(oldestKey);
+                oldChar.element.remove();
+                this.characters.delete(oldestKey);
+            }
+        }
+        const spawnTime = Date.now();
+        const charObj = {
+            x: Math.random() * (this.world.offsetWidth - this.config.CHAR_SIZE),
+            y: this.config.WORLD_HEIGHT - this.config.CHAR_SIZE,
+            vx: 0, vy: 0,
+            width: this.config.CHAR_SIZE,
+            height: this.config.CHAR_SIZE,
+            state: 'Idle',
+            color: color,
+            nickname: nickname,
+            isGrounded: true,
+            element: null,
+            actionTimer: 1000,
+            dieTime: spawnTime + this.config.MAX_LIFETIME,
+            bubbleTimeout: null
+        };
+        const bodyColor = this.turtleColors[Math.floor(Math.random() * this.turtleColors.length)];
+        const container = document.createElement('div');
+        container.className = 'character-container Idle';
+        container.style.setProperty("--mask-color", color);
+        container.style.setProperty("--turtle-color", bodyColor);
+        const lifeContainer = document.createElement('div');
+        lifeContainer.className = 'life-bar-container';
+        const lifeFill = document.createElement('div');
+        lifeFill.className = 'life-bar-fill';
+        lifeContainer.appendChild(lifeFill);
+        charObj.lifeFill = lifeFill;
+        // Ваш оригинальный SVG без изменений
+        const svgTemplate = `
+            <svg id="Turtle" class="svg-char" width="300" hight="300" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 496.08 511.25">
                 <defs>
                     <style>
                         .cls-1 {
@@ -372,127 +376,89 @@ function CreateCharacter(key, color, nickname, message, emotes) {
                 </g>
             </svg>
     `;
+        const nickEl = document.createElement('div');
+        nickEl.className = 'nickname';
+        nickEl.style.color = color;
+        nickEl.innerText = nickname;
+        const bubbleEl = document.createElement('div');
+        bubbleEl.className = 'bubble';
+        charObj.bubbleEl = bubbleEl;
+        container.appendChild(bubbleEl);
+        container.appendChild(lifeContainer);
+        container.appendChild(nickEl);
+        container.insertAdjacentHTML('beforeend', svgTemplate);
 
-    const nickEl = document.createElement('div');
-    nickEl.className = 'nickname';
-    nickEl.style.color = color;
-    nickEl.innerText = nickname;
+        this.world.appendChild(container);
+        charObj.element = container;
+        this.characters.set(key, charObj);
 
-    const bubbleEl = document.createElement('div');
-    bubbleEl.className = 'bubble';
-    charObj.bubbleEl = bubbleEl;
-
-    container.appendChild(bubbleEl);
-    container.appendChild(lifeContainer);
-    container.appendChild(nickEl);
-
-    container.insertAdjacentHTML('beforeend', svgTemplate);
-
-    world.appendChild(container);
-
-    charObj.element = container;
-    characters.set(key, charObj);
-
-    updateCharacterBubble(charObj, message, emotes);
-}
-
-export function spawnCharacterFromMessage(payload) {
-
-    const platform = (payload?.platform || "unknown").toLowerCase();
-    const userName = payload?.user || "Anonymous";
-    const color = resolveMessageColor(payload);
-    const message = payload?.message || "";
-    const key = `${platform}:${userName.trim().toLowerCase()}`;
-
-    if (characters.has(key)) {
-        const char = characters.get(key);
-        char.dieTime = Date.now() + config.MAX_LIFETIME;
-        updateCharacterBubble(char, message, payload.emotes); 
-
-        // Добавляем прыжок при получении сообщения (заменю потом эмоцию)
-        //if (char.isGrounded) {
-        //    char.vy = config.JUMP_POWER;
-        //    char.isGrounded = false;
-        //}
-    } else {
-        CreateCharacter(key, color, userName, message, payload.emotes);
+        this._updateCharacterBubble(charObj, message, emotes);
     }
-}
+    _animationLoop() {
+        if (!this.world) return;
+        const now = Date.now();
+        const worldWidth = this.world.offsetWidth;
+        const currentPlatforms = this._getComputedPlatforms();
+        for (let [key, char] of this.characters) {
+            const timeLeft = char.dieTime - now;
+            const percent = Math.max(0, (timeLeft / this.config.MAX_LIFETIME) * 100);
 
-function animationLoop() {
-    if (!world) return;
-    const now = Date.now();
-    const worldWidth = world.offsetWidth;
-    const currentPlatforms = getComputedPlatforms();
+            if (timeLeft <= 0) {
+                char.element.style.transition = 'opacity 0.5s, transform 0.5s';
+                char.element.style.opacity = '0';
+                char.element.style.transform += ' scale(0)';
+                setTimeout(() => char.element.remove(), 500);
+                this.characters.delete(key);
+                continue;
+            }
+            char.lifeFill.style.width = percent + '%';
+            if (percent < 30) char.lifeFill.style.backgroundColor = '#e74c3c';
+            else if (percent < 60) char.lifeFill.style.backgroundColor = '#f1c40f';
+            else char.lifeFill.style.backgroundColor = '#2ecc71';
+            char.actionTimer -= 16;
+            if (char.actionTimer <= 0 && char.isGrounded) {
+                char.actionTimer = Math.random() * 2000 + 500;
+                const rand = Math.random();
+                if (rand < 0.3) { char.vx = -this.config.WALK_SPEED; char.state = 'Walking'; }
+                else if (rand < 0.6) { char.vx = this.config.WALK_SPEED; char.state = 'Walking'; }
+                else if (rand < 0.8) { char.vy = this.config.JUMP_POWER; char.isGrounded = false; char.state = 'Jumping'; }
+                else { char.vx = 0; char.state = 'Idle'; }
+            }
+            char.vy += this.config.GRAVITY;
+            const prevY = char.y;
+            char.x += char.vx;
+            char.y += char.vy;
+            if (char.x < 0) { char.x = 0; char.vx *= -1; }
+            else if (char.x + char.width > worldWidth) { char.x = worldWidth - char.width; char.vx *= -1; }
 
-    for (let [key, char] of characters) {
-        const timeLeft = char.dieTime - now;
-        const percent = Math.max(0, (timeLeft / config.MAX_LIFETIME) * 100);
+            char.isGrounded = false;
 
-        if (timeLeft <= 0) {
-            char.element.style.transition = 'opacity 0.5s, transform 0.5s';
-            char.element.style.opacity = '0';
-            char.element.style.transform += ' scale(0)';
-            setTimeout(() => char.element.remove(), 500);
-            characters.delete(key);
-            continue;
-        }
-
-        // Логика движений
-        char.lifeFill.style.width = percent + '%';
-        if (percent < 30) char.lifeFill.style.backgroundColor = '#e74c3c';
-        else if (percent < 60) char.lifeFill.style.backgroundColor = '#f1c40f';
-        else char.lifeFill.style.backgroundColor = '#2ecc71';
-
-        char.actionTimer -= 16;
-        if (char.actionTimer <= 0 && char.isGrounded) {
-            char.actionTimer = Math.random() * 2000 + 500;
-            const rand = Math.random();
-            if (rand < 0.3) { char.vx = -config.WALK_SPEED; char.state = 'Walking'; }
-            else if (rand < 0.6) { char.vx = config.WALK_SPEED; char.state = 'Walking'; }
-            else if (rand < 0.8) { char.vy = config.JUMP_POWER; char.isGrounded = false; char.state = 'Jumping'; }
-            else { char.vx = 0; char.state = 'Idle'; }
-        }
-
-        char.vy += config.GRAVITY;
-        const prevY = char.y;
-        char.x += char.vx;
-        char.y += char.vy;
-
-        if (char.x < 0) { char.x = 0; char.vx *= -1; }
-        else if (char.x + char.width > worldWidth) { char.x = worldWidth - char.width; char.vx *= -1; }
-
-        char.isGrounded = false;
-        if (char.vy > 0) {
-            for (let p of currentPlatforms) {
-                if (prevY + char.height <= p.top && char.y + char.height >= p.top &&
-                    char.x + char.width > p.left && char.x < p.right) {
-                    char.y = p.top - char.height;
-                    char.vy = 0; char.isGrounded = true;
-                    char.state = char.vx === 0 ? 'Idle' : 'Walking';
-                    break;
+            if (char.vy > 0) {
+                for (let p of currentPlatforms) {
+                    if (prevY + char.height <= p.top && char.y + char.height >= p.top &&
+                        char.x + char.width > p.left && char.x < p.right) {
+                        char.y = p.top - char.height;
+                        char.vy = 0; char.isGrounded = true;
+                        char.state = char.vx === 0 ? 'Idle' : 'Walking';
+                        break;
+                    }
                 }
             }
+            if (char.y + char.height >= this.config.WORLD_HEIGHT) {
+                char.y = this.config.WORLD_HEIGHT - char.height;
+                char.vy = 0; char.isGrounded = true;
+                char.state = char.vx === 0 ? 'Idle' : 'Walking';
+            }
+            char.element.style.transform = `translate(${char.x}px, ${char.y}px)`;
+            const svgChar = char.element.querySelector('.svg-char');
+            if (svgChar) {
+                if (char.vx > 0) svgChar.style.transform = 'scaleX(1)';
+                else if (char.vx < 0) svgChar.style.transform = 'scaleX(-1)';
+            }
+
+            char.element.className = `character-container ${char.state}`;
         }
 
-        if (char.y + char.height >= config.WORLD_HEIGHT) {
-            char.y = config.WORLD_HEIGHT - char.height;
-            char.vy = 0; char.isGrounded = true;
-            char.state = char.vx === 0 ? 'Idle' : 'Walking';
-        }
-
-        char.element.style.transform = `translate(${char.x}px, ${char.y}px)`;
-        const svgChar = char.element.querySelector('.svg-char');
-        if (char.vx > 0) svgChar.style.transform = 'scaleX(1)';
-        else if (char.vx < 0) svgChar.style.transform = 'scaleX(-1)';
-        char.element.className = `character-container ${char.state}`;
+        requestAnimationFrame(this._animationLoop);
     }
-
-    requestAnimationFrame(animationLoop);
-}
-
-export function initCharacterWorld() {
-    if (!world) return;
-    createPlatforms(platformSettings);
-    requestAnimationFrame(animationLoop);
 }
