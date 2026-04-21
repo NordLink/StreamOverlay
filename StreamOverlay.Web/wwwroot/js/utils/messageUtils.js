@@ -4,7 +4,6 @@
     return div.innerHTML;
 }
 export function formatMessageWithEmotes(message, emotes) {
-    console.log("message" + message)
     if (!emotes || emotes.length === 0) {
         return escapeHtml(message);
     }

@@ -2,13 +2,13 @@
 import { Chat } from './components/Chat.js';
 import { ChannelHeader } from './components/ChannelHeader.js';
 import { ViewerStats } from './components/ViewerStats.js';
-import { Characters } from './components/Characters.js'; // Импортируем новый класс
+import { Characters } from './components/Characters.js';
 
 (() => {
     // Инициализация компонентов
-    const header = new ChannelHeader("channelName");
-    const stats = new ViewerStats();
-    const chat = new Chat("chat", 80);
+    const header = new ChannelHeader("channel-name", { staticName: "OneGoldShow" });
+    const stats = new ViewerStats("viewers-info");
+    const chat = new Chat("chat", 30);
 
     const characterWorld = new Characters("world");
     characterWorld.init();
