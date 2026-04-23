@@ -55,6 +55,7 @@ app.MapHub<ChatHub>("/chat-hub");
 app.MapGet("/", () => Results.File("index.html", "text/html"));
 app.MapGet("/overlay", () => Results.File("pages/overlay.html", "text/html"));
 app.MapGet("/chat", () => Results.File("pages/chat.html", "text/html"));
+app.MapGet("/viewers", () => Results.File("pages/viewers.html", "text/html"));
 
 app.MapFallbackToFile("index.html");
 app.Run();

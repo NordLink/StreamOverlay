@@ -1,4 +1,5 @@
 ﻿using Microsoft.Extensions.Options;
+using TwitchLib.Api.Helix.Models.Chat;
 public class VkChatPollingService : BackgroundService
 {
     private readonly IVkLiveApiClient _vkClient;
@@ -67,27 +68,27 @@ public class VkChatPollingService : BackgroundService
         {
             foreach (var part in parts)
             {
-                // 1. Обычный текст
+                // Обычный текст
                 if (!string.IsNullOrWhiteSpace(part.Text?.Content))
                 {
                     textChunks.Add(part.Text.Content);
                 }
-                // 2. Эмодзи
+                // Эмодзи
                 else if (part.Smile != null)
                 {
                     var url = part.Smile.LargeUrl ?? part.Smile.MediumUrl ?? part.Smile.SmallUrl ?? "";
                     emotes.Add(new OverlayEmoteDto(part.Smile.Id ?? "0", part.Smile.Name ?? "smile", url));
                     textChunks.Add(" " + part.Smile.Name + " ");
                 }
-                // 3. Упоминания
+                // Упоминания
                 else if (part.Mention?.Nick != null)
                 {
                     textChunks.Add(" @" + part.Mention.Nick + " ");
                 }
-                // 4. ССЫЛКИ (Исправление здесь)
+                // ССЫЛКИ (Исправление здесь)
                 else if (part.Link != null)
                 {
-                    // Используем Content, если он есть, иначе URL
+             
                     var linkContent = !string.IsNullOrWhiteSpace(part.Link.Content)
                         ? part.Link.Content
                         : part.Link.Url;
@@ -140,9 +141,21 @@ public class VkChatPollingService : BackgroundService
             if (string.IsNullOrWhiteSpace(text) && emoteList.Count == 0)
                 text = "[empty]";
             var color = GetColorFromPalette(message.Author?.NickColor);
-       
+
+            // Преобразование секунды в объект времени, сдвигаем на +3 часа и форматируем
+            var sendTime = DateTimeOffset.FromUnixTimeSeconds(message.CreatedAt)
+                .ToOffset(TimeSpan.FromHours(3))
+                .ToString("HH:mm");
+
             await _broadcast.SendChatMessageAsync(
-                new OverlayChatMessageDto("vk", user, text, color, emoteList),
+                new OverlayChatMessageDto(
+                    Platform: "vk",
+                    User: user,
+                    Message: text,
+                    Color: color,                    
+                    Emotes: emoteList,
+                    SendTime: sendTime
+                    ),
                 ct);
             RememberId(message.Id);
         }

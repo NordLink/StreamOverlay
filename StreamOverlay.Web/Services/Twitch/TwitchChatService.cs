@@ -47,15 +47,19 @@ public class TwitchChatService : BackgroundService
                     ? e.ChatMessage.Username
                     : e.ChatMessage.DisplayName;
                 var userColor = ResolveUserColor(e.ChatMessage.Username, e.ChatMessage.HexColor);
-    
-                await _broadcast.SendChatMessageAsync(
-                    new OverlayChatMessageDto(
-                        "twitch",
-                        userName,
-                        e.ChatMessage.Message,
-                        userColor,
-                        emoteList),
-                    stoppingToken);
+
+                // преобразования времени из UTC в московское (UTC+3) и форматирования в строку «часы:минуты»
+                var moscowTime = e.ChatMessage.TmiSent.ToOffset(TimeSpan.FromHours(3));
+                var formattedDate = moscowTime.ToString("HH:mm");
+
+                await _broadcast.SendChatMessageAsync(new OverlayChatMessageDto(
+                    Platform: "twitch", 
+                    User: userName, 
+                    Message: e.ChatMessage.Message, 
+                    Color: userColor, 
+                    SendTime: formattedDate,
+                    Emotes: emoteList), 
+                  stoppingToken);
             }
             catch (Exception ex)
             {

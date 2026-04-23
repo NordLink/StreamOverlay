@@ -1,4 +1,6 @@
-﻿public record OverlayEmoteDto(
+﻿using System.Text.Json.Serialization;
+
+public record OverlayEmoteDto(
     string Id,
     string Name,
     string Url
@@ -19,5 +21,7 @@ public record OverlayChatMessageDto(
     string User,
     string Message,
     string? Color,
+    string? SendTime = null,
     List<OverlayEmoteDto>? Emotes = null
  );
+

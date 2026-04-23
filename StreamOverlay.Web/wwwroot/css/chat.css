@@ -21,7 +21,7 @@ body {
     top: 0;
     left: 0;
     right: 0;
-    bottom: 70px;
+    bottom: 0;
     display: flex;
     flex-direction: column;
     justify-content: space-between;
@@ -73,6 +73,8 @@ body {
     font-weight: bold;
     margin-right: 10px;
     margin-left: 10px;
+    text-shadow: -1px -1px 0 #333, 1px -1px 0 #333, -1px 1px 0 #333, 1px 1px 0 #333;
+    
 }
 
 .msg {
@@ -100,17 +102,4 @@ body {
     border-radius: 12px;
     background: rgba(20, 20, 20, 0.9);
     border: 1px solid rgba(0, 0, 0, 1);
-}
-
-#viewers-info {
-    width: 100%;
-    display: flex;
-    justify-content: space-around;
-    font-size: 24px;
-    font-weight: bold;
-    padding-bottom: 10px;
-}
-
-.info-block {
-    text-align: center;
 }

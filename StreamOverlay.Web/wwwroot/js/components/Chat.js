@@ -4,8 +4,8 @@ export class Chat {
     constructor(elementId, options = {}) {
         this.container = document.getElementById(elementId);
         this.container.classList.add('chat-list');
-        this.maxLines = options.maxLines || 80;
-
+        this.maxLines = options.maxLines || 50;
+        this.showTime = options.showTime || false;
         // Режим отображения платформы: 'tag' (по умолчанию) или 'border' (platformDisplay: 'border')
         this.platformDisplay = options.platformDisplay || 'tag';
         this.platformTitles = { twitch: "tw", vk: "vk" };
@@ -19,6 +19,7 @@ export class Chat {
         return badge;
     }
     appendMessage(payload) {
+       
         if (!this.container) return;
         const platform = (payload?.platform || "unknown").toLowerCase();
         const userColor = resolveMessageColor(payload);
@@ -31,9 +32,22 @@ export class Chat {
             const badge = this.createPlatformBadge(platform);
             line.appendChild(badge);
         } else if (this.platformDisplay === 'border') {
-            line.style.borderRight = `6px solid ${platformColor}`;
-            line.style.borderTopRightRadius = "6px";
-            line.style.borderBottomRightRadius = "6px";
+            line.style.background = `
+                linear-gradient(to right, ${platformColor}80 0%, transparent 10%),  
+                rgba(20, 20, 20, 0.9)
+            `;
+            line.style.borderTopRightRadius = "8px";
+            line.style.borderBottomRightRadius = "8px";
+        }
+
+        if (this.showTime) {
+            const timeSpan = document.createElement("span");
+            timeSpan.className = "send-time";
+            timeSpan.textContent = payload?.time;
+            timeSpan.style.opacity = "0.6";
+            const marginSide = this.platformDisplay === 'tag' ? 'marginLeft' : 'marginRight';
+            timeSpan.style[marginSide] = "8px";
+            line.appendChild(timeSpan);
         }
        
         const user = document.createElement("span");
