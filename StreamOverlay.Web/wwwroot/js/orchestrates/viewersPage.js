@@ -1,5 +1,5 @@
-﻿import { ConnectionService } from './services/ConnectionService.js';
-import { ViewerStats } from './components/ViewerStats.js';
+﻿import { ConnectionService } from '../services/connectionService.js';
+import { ViewerStats } from '../components/viewerStats.js';
 
 const stats = new ViewerStats("viewers-info");
 const connection = new ConnectionService("/chat-hub");

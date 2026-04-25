@@ -5,9 +5,9 @@ export class Chat {
         this.container = document.getElementById(elementId);
         this.container.classList.add('chat-list');
         this.maxLines = options.maxLines || 50;
-        this.showTime = options.showTime || false;
-        // Режим отображения платформы: 'tag' (по умолчанию) или 'border' (platformDisplay: 'border')
-        this.platformDisplay = options.platformDisplay || 'tag';
+        this.showTime = options.showTime ?? true;
+        this.showPlatformTag = options.showPlatformTag ?? true;
+        this.showPlatformColor = options.showPlatformColor ?? true;
         this.platformTitles = { twitch: "tw", vk: "vk" };
         this.platformColors = { twitch: "#9146FF", vk: "#2787F5" };
     }
@@ -28,25 +28,21 @@ export class Chat {
         const line = document.createElement("div");
         line.className = "chat-line";
 
-        if (this.platformDisplay === 'tag') {
+        if (this.showPlatformTag) {
             const badge = this.createPlatformBadge(platform);
             line.appendChild(badge);
-        } else if (this.platformDisplay === 'border') {
+        }
+        if (this.showPlatformColor) {
             line.style.background = `
-                linear-gradient(to right, ${platformColor}80 0%, transparent 10%),  
+                linear-gradient(to right, ${platformColor}80 0%, transparent 10%),
                 rgba(20, 20, 20, 0.9)
             `;
-            line.style.borderTopRightRadius = "8px";
-            line.style.borderBottomRightRadius = "8px";
         }
 
         if (this.showTime) {
             const timeSpan = document.createElement("span");
             timeSpan.className = "send-time";
             timeSpan.textContent = payload?.time;
-            timeSpan.style.opacity = "0.6";
-            const marginSide = this.platformDisplay === 'tag' ? 'marginLeft' : 'marginRight';
-            timeSpan.style[marginSide] = "8px";
             line.appendChild(timeSpan);
         }
        
@@ -54,11 +50,6 @@ export class Chat {
         user.className = "user";
         user.textContent = (payload?.user || "Anonymous") + ":";
         user.style.color = userColor;
-
-        // Если используем border, убираем лишний левый отступ у имени, 
-        if (this.platformDisplay === 'border') {
-            user.style.marginLeft = "0";
-        }
  
         const msg = document.createElement("span");
         msg.className = "msg";

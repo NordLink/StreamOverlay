@@ -1,8 +1,8 @@
-﻿import { ConnectionService } from './services/ConnectionService.js';
-import { Chat } from './components/Chat.js';
-import { ChannelHeader } from './components/ChannelHeader.js';
-import { ViewerStats } from './components/ViewerStats.js';
-import { Characters } from './components/Characters.js';
+﻿import { ConnectionService } from '../services/connectionService.js';
+import { Chat } from '../components/chat.js';
+import { ChannelHeader } from '../components/channelHeader.js';
+import { ViewerStats } from '../components/viewerStats.js';
+import { Characters } from '../components/characters.js';
 
 (() => {
     // Инициализация компонентов

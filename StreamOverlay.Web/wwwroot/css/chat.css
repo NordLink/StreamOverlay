@@ -67,12 +67,17 @@ body {
     letter-spacing: 0.08em;
     flex-shrink: 0;
     font-weight: normal;
+    margin-right: 10px;
+}
+
+.send-time {
+    opacity: 0.6;
+    margin-right: 10px;
 }
 
 .user {
     font-weight: bold;
     margin-right: 10px;
-    margin-left: 10px;
     text-shadow: -1px -1px 0 #333, 1px -1px 0 #333, -1px 1px 0 #333, 1px 1px 0 #333;
     
 }

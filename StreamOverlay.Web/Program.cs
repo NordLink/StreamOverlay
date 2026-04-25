@@ -46,16 +46,22 @@ builder.Services.AddHostedService<TwitchChannelInfoService>();
 builder.Services.AddHostedService<TwitchChatService>();
 builder.Services.AddHostedService<VkChatPollingService>();
 builder.Services.AddHostedService<VkViewerPollingService>();
+builder.Services.AddSingleton<IComponentConfigService, ComponentConfigService>();
 
 var app = builder.Build();
 
 app.UseStaticFiles();
 app.MapHub<ChatHub>("/chat-hub");
 
-app.MapGet("/", () => Results.File("index.html", "text/html"));
+app.MapGet("/", () => Results.File("pages/index.html", "text/html"));
 app.MapGet("/overlay", () => Results.File("pages/overlay.html", "text/html"));
 app.MapGet("/chat", () => Results.File("pages/chat.html", "text/html"));
 app.MapGet("/viewers", () => Results.File("pages/viewers.html", "text/html"));
+app.MapGet("/api/config", async (IComponentConfigService configService) =>
+{
+    var json = await configService.GetConfigAsync();
+    return Results.Content(json, "application/json");
+});
 
 app.MapFallbackToFile("index.html");
 app.Run();

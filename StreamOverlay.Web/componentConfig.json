@@ -1,0 +1,13 @@
+{
+  "chat": {
+    "maxLines": 12,
+    "showPlatformTag": true,
+    "showPlatformColor": true,
+    "showTime": true
+  },
+  "viewers": {
+
+  },
+  "overlay": {
+  }
+}
