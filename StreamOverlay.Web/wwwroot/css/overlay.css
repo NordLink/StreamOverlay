@@ -10,8 +10,8 @@
     --danger: #ef4444;
     --warning: #fbbf24;
     --screen-glow: rgba(96, 165, 250, 0.32);
-    --appwidth: 2560px;
-    --appheight: 1440px;
+    --appwidth: 2560;
+    --appheight: 1440;
 }
 
 * {
@@ -29,8 +29,14 @@ body {
 }
 
 body {
-    width: var(--appwidth);
-    height: var(--appheight);
+}
+
+#container {
+    aspect-ratio: var(--appwidth) / var(--appheight);
+    width: 100vw;
+    max-height: 100vh;
+    max-width: calc(100vh * (2560 / 1440));
+    margin: auto;
     background-position: center;
     background-repeat: no-repeat;
     mask: url(#video-mask);
@@ -39,14 +45,19 @@ body {
 
 #sky {
     position: fixed;
-    width: var(--appwidth);
-    height: var(--appheight);
-    inset: 0;
+    aspect-ratio: var(--appwidth) / var(--appheight);
+    width: 100vw;
+    max-height: 100vh;
+    max-width: calc(100vh * (2560 / 1440));
+    margin: auto;
+    background-position: center;
+    background-repeat: no-repeat;
     overflow: hidden;
     pointer-events: none;
     background: radial-gradient(circle at 50% -20%, rgba(53, 102, 181, 0.22), transparent 38%), radial-gradient(circle at 50% 100%, rgba(110, 95, 180, 0.18), transparent 30%), linear-gradient(0deg, #050816 0%, #0a1026 28%, #101a38 58%, #0a1329 85%, #040712 100% );
     background-size: cover;
 }
+
     #sky::before,
     #sky::after {
         content: "";
@@ -58,14 +69,14 @@ body {
     }
 
     #sky::before {
-        background-image: radial-gradient(4px 4px at 10% 20%, #ffffff, transparent 70%), radial-gradient(6px 6px at 40% 70%, #ffffff, transparent 70%), radial-gradient(4px 4px at 80% 30%, #ffffff, transparent 70%);
-        background-size: 500px 500px;
+        background-image: radial-gradient(0.2vw 0.2vw at 10% 20%, #ffffff, transparent 70%), radial-gradient(0.3vw 0.3vw at 40% 70%, #ffffff, transparent 70%), radial-gradient(0.2vw 0.2vw at 80% 30%, #ffffff, transparent 70%);
+        background-size: 25% 25%;
         animation: twinkle 4s infinite ease-in-out;
     }
 
     #sky::after {
-        background-image: radial-gradient(6px 6px at 20% 50%, #ffffff, transparent 70%), radial-gradient(4px 4px at 60% 10%, #ffffff, transparent 70%), radial-gradient(6px 6px at 90% 80%, #ffffff, transparent 70%);
-        background-size: 600px 600px;
+        background-image: radial-gradient(0.3vw 0.3vw at 20% 50%, #ffffff, transparent 70%), radial-gradient(0.2vw 0.2vw at 60% 10%, #ffffff, transparent 70%), radial-gradient(0.3vw 0.3vw at 90% 80%, #ffffff, transparent 70%);
+        background-size: 35% 35%;
         animation: twinkle 6s infinite ease-in-out reverse;
     }
 
@@ -81,58 +92,64 @@ body {
 
 .moon {
     position: absolute;
-    top: 50px;
-    right: 120px;
-    width: 110px;
-    height: 110px;
+    top: 5%;
+    aspect-ratio: 1 / 1;
+    right: 10%;
+    width: 5%;
     border-radius: 50%;
     background: radial-gradient(circle at 35% 35%, #ffffff 0%, #f5f3ff 35%, #dbeafe 70%, #c7d2fe 100%);
     box-shadow: 0 0 18px rgba(255,255,255,0.35), 0 0 40px rgba(191,219,254,0.25), 0 0 75px rgba(147,197,253,0.18);
-    opacity: 0.95;
+    opacity: 0.9;
+    z-index: 1;
 }
 
     .moon::before {
         content: "";
         position: absolute;
-        top: 12px;
-        left: 24px;
-        width: 16px;
-        height: 16px;
+        inset: 0;
         border-radius: 50%;
-        background: rgba(148, 163, 184, 0.14);
-        box-shadow: 22px 20px 0 4px rgba(148, 163, 184, 0.12), 40px -4px 0 2px rgba(148, 163, 184, 0.10), -8px 38px 0 5px rgba(148, 163, 184, 0.10);
+        background: radial-gradient(circle at 30% 25%, rgba(148, 163, 184, 0.15) 10%, transparent 12%), radial-gradient(circle at 60% 45%, rgba(148, 163, 184, 0.12) 8%, transparent 10%), radial-gradient(circle at 80% 20%, rgba(148, 163, 184, 0.10) 6%, transparent 8%), radial-gradient(circle at 45% 75%, rgba(148, 163, 184, 0.10) 12%, transparent 14%);
+        background-size: 100% 100%;
     }
 
 .moon-glow {
     position: absolute;
-    top: 22px;
-    right: 88px;
-    width: 180px;
-    height: 180px;
+    top: 5%;
+    right: 7%;
+    width: 10%;
+    height: 10%;
     border-radius: 50%;
-    background: radial-gradient(circle, rgba(191,219,254,0.18) 0%, rgba(191,219,254,0.08) 40%, transparent 72%);
+    background: radial-gradient(circle, rgba(191,219,254,1) 0%, rgba(191,219,254,0.08) 40%, transparent 72%);
     filter: blur(10px);
     opacity: 0.9;
+    z-index: -1;
 }
 
-#container {
+.wrapper {
+    aspect-ratio: var(--appwidth) / var(--appheight);
     position: relative;
-    width: var(--appwidth);
-    height: var(--appheight);
-    background: url('/img/overlay_bg.png') no-repeat center center / cover;
-    z-index: 2; 
+    width: 100%;
+    height: 100%;
+    background: url('/assets/img/overlay_bg.png') no-repeat center center / contain;
+    z-index: 2;
+    container-type: size;
 }
 
 .channel-name-wrapper {
-    position: fixed;
-    top: 200px;
-    left: 1670px;
-    width: 774px;
+    position: absolute;
+    top: 13.5%;
+    left: 69%;
+    width: 23%;
     text-align: center;
-    font-size: 40px;
+    font-size: 1.8cqw;
     font-weight: bold;
     overflow: hidden;
 }
+#channel-name {
+   
+}
+
+
 
 /* стили чата */
 
@@ -231,6 +248,7 @@ body {
     width: 774px;
     height: 70px;
 }
+
 #viewers-info {
     width: 100%;
     display: flex;

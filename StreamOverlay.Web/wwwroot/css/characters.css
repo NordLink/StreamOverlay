@@ -1,20 +1,27 @@
 ﻿#world {
     position: absolute;
-    bottom: 50px;
+    bottom: 4.2%;
     left: 0;
-    width: var(--appwidth);
-    height: 400px;
-    background-color: rgb(0,0,0, 0.0);
-    /*    border-bottom: 6px solid #80b5f0;*/
+    width: 100%;
+    /* Убираем фиксированную высоту */
+    /* height: 400px; */
+    height: auto;
+    /* Задаем соотношение сторон. 
+       Например, 21/9 (широкоформатное) или 16/9, 2/1. 
+       Оригинальное 100% ширины к 400px ближе к 2.5/1 на десктопе */
+    aspect-ratio: 21 / 3;
+    /* Защита, чтобы мир не стал слишком высоким на узких/высоких экранах */
+    max-height: 70vh;
+    background-color: rgb(0,0,0, 0);
     box-sizing: unset;
 }
 
 .platform {
     position: absolute;
-/*    background-color: #216cc0;
+    background-color: #216cc0;
     border-top: 4px solid #80b5f0;
     border-radius: 4px;
-    box-shadow: 0 4px 6px rgba(0,0,0,0.3);*/
+    box-shadow: 0 4px 6px rgba(0,0,0,0.3);
 }
 
 .character-container {
@@ -22,9 +29,11 @@
     width: 80px;
     height: 80px;
     will-change: transform;
-    transition: none !important;        
+    transition: none !important;   
 }
-
+.character-collider {
+    background: #ff0;
+}
 .svg-char {
     width: 100%;
     height: 100%;

@@ -10,13 +10,14 @@
     <script type="module" src="/js/orchestrates/overlayPage.js"></script>
 </head>
 <body>
+    <div id="container">
 
-    <div id="sky">
-        <div class="moon"></div>
-        <div class="moon-glow"></div>
-    </div>
+        <div id="sky">
+            <div class="moon"></div>
+            <div class="moon-glow"></div>
+        </div>
 
-    <div id="container">        
+        <div class="wrapper">
             <div class="channel-name-wrapper">
                 <div id="channel-name"></div>
             </div>
@@ -27,15 +28,19 @@
 
             <div class="viewers-info-wrapper">
                 <div id="viewers-info"></div>
-            </div>      
-        <div id="world"></div>
+            </div>
+
+            <div id="world"></div>
+        </div>       
+        
     </div>
+    
 </body>
 <svg width="0" height="0">
     <defs>
-        <mask id="video-mask">
-            <rect width="2560" height="1440" fill="white" />
-            <rect x="100" y="192" width="1400" height="800" rx="0" fill="black" />
+        <mask id="video-mask" maskContentUnits="objectBoundingBox">
+            <rect width="1" height="1" fill="white" />
+            <rect x="0.03906" y="0.13333" width="0.54687" height="0.55555" fill="black" />
         </mask>
     </defs>
 </svg>
