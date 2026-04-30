@@ -5,16 +5,19 @@
     <meta name="viewport" content="width=device-width,initial-scale=1" />
     <title>Stream Overlay</title>
     <link rel="stylesheet" href="/css/overlay.css" />
-    <link rel="stylesheet" href="/css/characters.css" />
+    <link rel="stylesheet" href="/css/gameWorld.css" />
     <script src="https://cdnjs.cloudflare.com/ajax/libs/microsoft-signalr/7.0.5/signalr.min.js"></script>
     <script type="module" src="/js/orchestrates/overlayPage.js"></script>
+    <!--<script type="module" src="/js/debugPanel.js"></script>-->
 </head>
 <body>
     <div id="container">
 
-        <div id="sky">
-            <div class="moon"></div>
-            <div class="moon-glow"></div>
+        <div id="masked-bg">
+            <div id="sky">
+                <div class="moon"></div>
+                <div class="moon-glow"></div>
+            </div>
         </div>
 
         <div class="wrapper">

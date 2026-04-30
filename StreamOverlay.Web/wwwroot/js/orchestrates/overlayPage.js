@@ -2,7 +2,7 @@
 import { Chat } from '../components/chat.js';
 import { ChannelHeader } from '../components/channelHeader.js';
 import { ViewerStats } from '../components/viewerStats.js';
-import { Characters } from '../components/characters.js';
+import { GameWorld } from '../components/gameworld/gameWorld.js';
 
 (() => {
     // Инициализация компонентов
@@ -10,8 +10,8 @@ import { Characters } from '../components/characters.js';
     //const stats = new ViewerStats("viewers-info");
     //const chat = new Chat("chat", 30);
 
-    const characterWorld = new Characters("world");
-    characterWorld.init();
+    const gameWorld = new GameWorld("world");
+    gameWorld.init();
     //const logStatus = (connectionStatus) => {
     //    let statusText = connectionStatus;
     //    if (connectionStatus === "CONNECTED") {
@@ -35,10 +35,10 @@ import { Characters } from '../components/characters.js';
     //};
     streamHub.onChatMessageCallback = (payload) => {
         //chat.appendMessage(payload);
-        characterWorld.spawnFromMessage(payload);
+        gameWorld.spawnFromMessage(payload);
     };
     //streamHub.onStatusChangeCallback = (status) => logStatus(status);
- 
+
     header.render();
     //stats.render();
     streamHub.start();

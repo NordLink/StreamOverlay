@@ -3,14 +3,8 @@
     bottom: 4.2%;
     left: 0;
     width: 100%;
-    /* Убираем фиксированную высоту */
-    /* height: 400px; */
     height: auto;
-    /* Задаем соотношение сторон. 
-       Например, 21/9 (широкоформатное) или 16/9, 2/1. 
-       Оригинальное 100% ширины к 400px ближе к 2.5/1 на десктопе */
     aspect-ratio: 21 / 3;
-    /* Защита, чтобы мир не стал слишком высоким на узких/высоких экранах */
     max-height: 70vh;
     background-color: rgb(0,0,0, 0);
     box-sizing: unset;
@@ -18,18 +12,16 @@
 
 .platform {
     position: absolute;
-    background-color: #216cc0;
+/*    background-color: #216cc0;
     border-top: 4px solid #80b5f0;
     border-radius: 4px;
-    box-shadow: 0 4px 6px rgba(0,0,0,0.3);
+    box-shadow: 0 4px 6px rgba(0,0,0,0.3);*/
 }
 
 .character-container {
     position: absolute;
-    width: 80px;
-    height: 80px;
     will-change: transform;
-    transition: none !important;   
+    transition: none !important;
 }
 .character-collider {
     background: #ff0;
@@ -48,18 +40,20 @@
 }
 
 .nickname {
-    top: -46px;
+    bottom: 100%; 
+    margin-bottom: 0.8cqw;
+    font-size: 1cqw;
     font-weight: 800;
-    font-size: 20px;
     white-space: nowrap;
     text-shadow: 1px 1px 0 #000, -1px -1px 0 #000, 1px -1px 0 #000, -1px 1px 0 #000;
     z-index: 10;
 }
 
 .life-bar-container {
-    top: -18px;
-    width: 60px;
-    height: 8px;
+    bottom: 100%;
+    margin-bottom: 0.3cqw;
+    width: 4cqw;
+    height: 0.4cqw;
     background: rgba(0, 0, 0, 0.5);
     border-radius: 3px;
     overflow: hidden;
@@ -74,21 +68,22 @@
 }
 
 .bubble {
-    bottom: 130px;
+    bottom: 100%;
+    margin-bottom: 1.8cqw;
     left: 50%;
     transform: translateX(-50%);
     position: absolute;
     background: white;
     color: #333;
-    padding: 8px 12px;
+    padding: 0.3cqw 0.6cqw;
     border-radius: 12px;
-    font-size: 20px;
+    font-size: 0.8cqw;
     font-weight: bold;
     display: flex;
     flex-direction: column;
     justify-content: flex-end;
     min-width: 40px;
-    max-width: 400px; 
+    max-width: 400px;
     width: max-content;
     white-space: normal;
     word-wrap: break-word;
@@ -100,12 +95,12 @@
     .bubble::after {
         content: '';
         position: absolute;
-        bottom: -8px; 
+        bottom: -0.3cqw;
         left: 50%;
         transform: translateX(-50%);
-        border-left: 8px solid transparent;
-        border-right: 8px solid transparent;
-        border-top: 8px solid white;
+        border-left: 0.4cqw solid transparent;
+        border-right: 0.4cqw solid transparent;
+        border-top: 0.4cqw solid white;
     }
 
 
@@ -154,4 +149,121 @@
 .Jumping .svg-char {
 /*    transform: scaleY(1.1);
     transition: transform 0.2s;*/
+}
+
+
+.Fighting {
+    #HandRight {
+        transform-box: fill-box;
+        transform-origin: 50% 0%;
+        animation: strikeRight 0.35s ease-in-out infinite;
+    }
+
+    #HandLeft {
+        animation-delay: -0.175s;
+    }
+}
+
+@keyframes strikeRight {
+    0%, 100% {
+        transform: rotate(-150deg);
+    }
+
+    50% {
+        transform: rotate(-30deg);
+    }
+}
+
+.Fighting {
+    #HandLeft {
+        transform-box: fill-box;
+        transform-origin: 50% 0%;
+        animation: strikeLeft 0.35s ease-in-out infinite;
+    }
+
+    #HandLeft {
+        animation-delay: -0.175s;
+    }
+}
+
+@keyframes strikeLeft {
+    0%, 100% {
+        transform: rotate(-90deg);
+    }
+
+    50% {
+        transform: rotate(-30deg);
+    }
+}
+
+
+.winner {
+    filter: drop-shadow(0 0 5px gold);
+    animation: winnerGlow 0.5s infinite alternate;
+}
+
+.hit {
+    
+    filter: brightness(1.5);
+}
+
+@keyframes winnerGlow {
+    from {
+        filter: drop-shadow(0 0 5px gold);
+    }
+
+    to {
+        filter: drop-shadow(0 0 2px orange);
+    }
+}
+
+@keyframes hitShake {
+    0% {
+        transform: translate(0, 0);
+    }
+
+    25% {
+        transform: translate(3px, -2px);
+    }
+
+    75% {
+        transform: translate(-3px, 2px);
+    }
+
+    100% {
+        transform: translate(0, 0);
+    }
+}
+.Dead {
+    opacity: 0.5;
+    filter: grayscale(100%)
+}
+
+
+.float-number {
+    font-size: 24px;
+    font-weight: bold;
+    text-shadow: 1px 1px 0 rgba(0, 0, 0, 0.5);
+    animation: floatUp 1s ease-out forwards;
+    will-change: transform, opacity;
+}
+
+    .float-number.damage {
+        color: #ff0000;
+    }
+
+    .float-number.heal {
+        color: #55ff55;
+    }
+
+@keyframes floatUp {
+    0% {
+        opacity: 1;
+        transform: translateX(-50%) translateY(0px);
+    }
+
+    100% {
+        opacity: 0;
+        transform: translateX(-50%) translateY(-50px);
+    }
 }

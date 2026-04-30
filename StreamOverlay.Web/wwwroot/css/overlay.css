@@ -39,8 +39,23 @@ body {
     margin: auto;
     background-position: center;
     background-repeat: no-repeat;
+/*    mask: url(#video-mask);
+    -webkit-mask: url(#video-mask);*/
+    overflow: hidden;
+}
+#masked-bg {
+    position: absolute;
+    aspect-ratio: var(--appwidth) / var(--appheight);
+    width: 100vw;
+    max-height: 100vh;
+    max-width: calc(100vh * (2560 / 1440));
+    margin: auto;
+    background-position: center;
+    background-repeat: no-repeat;
     mask: url(#video-mask);
     -webkit-mask: url(#video-mask);
+    z-index: 1; 
+    pointer-events: none;
 }
 
 #sky {
@@ -173,7 +188,6 @@ body {
     gap: 8px;
     -webkit-mask-image: linear-gradient(to bottom, transparent 0%, black 15%);
     mask-image: linear-gradient(to bottom, transparent 0%, black 15%);
-    /* Небольшой padding снизу, чтобы последнее сообщение не прилипало к краю */
     padding-bottom: 10px;
 }
 
@@ -215,7 +229,7 @@ body {
 
 .msg {
     display: inline;
-    word-wrap: break-word; /* Чтобы длинные сообщения переносились */
+    word-wrap: break-word;
 }
 
 .chat-emote {

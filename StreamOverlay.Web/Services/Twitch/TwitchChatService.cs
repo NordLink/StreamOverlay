@@ -28,6 +28,33 @@ public class TwitchChatService : BackgroundService
         var credentials = new ConnectionCredentials(_options.BotUsername, _options.BotOauth);
         _client = new TwitchClient();
         _client.Initialize(credentials, _options.WatchChannel);
+
+        // Логирование ошибок 
+        _client.OnConnectionError += async  (_, e) =>
+        {
+            _logger.LogError("Ошибка подключения к Twitch: {Error}", e.Error.Message);
+        };
+
+        _client.OnIncorrectLogin += async (_, e) =>
+        {
+            _logger.LogError("Ошибка авторизации Twitch: Неверный логин или OAuth токен. Проверьте учетные данные: {Exception}", e.Exception?.Message);
+        };
+        
+        _client.OnJoinedChannel += async  (_, e) =>
+        {
+            _logger.LogInformation("Успешно зашли на канал: {Channel}", e.Channel);
+        };
+       
+        _client.OnFailureToReceiveJoinConfirmation += async (_, e) =>
+        {
+            _logger.LogWarning("Не удалось зайти на канал: {Exception}", e.Exception);
+        };
+    
+        _client.OnDisconnected += async (_, e) =>
+        {
+            _logger.LogWarning("Twitch chat отключен.");
+        };
+
         _client.OnMessageReceived += async (_, e) =>
         {
 
@@ -107,4 +134,6 @@ public class TwitchChatService : BackgroundService
             return TwitchDefaultColors[index];
         }
     }
+
+
 }
