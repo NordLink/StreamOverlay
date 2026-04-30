@@ -14,8 +14,11 @@ export class Chat {
     createPlatformBadge(platform) {
         const badge = document.createElement("span");
         badge.className = "platform-tag";
-        badge.textContent = this.platformTitles[platform] || (platform || "UNK").toUpperCase();
-        badge.style.background = this.platformColors[platform] || "#374151";
+        if (platform === "twitch") badge.classList.add("twitch");
+        else if (platform === "vk") badge.classList.add("vk");
+        else badge.classList.add("unknown");
+        badge.setAttribute("aria-label", platform || "unknown platform");
+     
         return badge;
     }
     appendMessage(payload) {

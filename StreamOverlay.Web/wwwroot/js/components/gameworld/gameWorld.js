@@ -167,7 +167,7 @@ export class GameWorld {
 
         const defaultConfig = {
             GRAVITY: 0.5,
-            JUMP_POWER: -10,
+            JUMP_POWER: -8,
             WALK_SPEED_PERCENT_PER_SECOND: 5,
             CHAR_SIZE: 4,
             COLLIDER_WIDTH_PERCENT: 50,
@@ -183,12 +183,12 @@ export class GameWorld {
 
         this.platformSettings = [
             { left: 87, top: 77.5, width: 13, height: 20 },
-            { left: 60.5, top: 65, width: 2.5, height: 20 },
+            { left: 60.5, top: 62, width: 2.5, height: 20 },
             { left: 49.5, top: 63, width: 6.5, height: 20 },
             { left: 49.3, top: 81.25, width: 7, height: 20 },
             { left: 18.5, top: 63, width: 6.5, height: 20 },
             { left: 18.3, top: 81.25, width: 7, height: 20 },
-            { left: 12, top: 65, width: 2.5, height: 20 }
+            { left: 12, top: 62, width: 2.5, height: 20 }
         ];
 
         this.walkSpeedPxPerFrame = 0;

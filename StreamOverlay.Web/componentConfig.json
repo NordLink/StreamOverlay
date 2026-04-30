@@ -1,13 +1,19 @@
 {
+  "overlay": {
+    "gameWorld": {
+      "MAX_CHARACTERS": 20,
+      "MAX_MESSAGE_LENGTH": 160,
+      "character": "turtle"
+    }
+  },
+  "channelHeader": {
+    "staticName": "OneGoldShow"
+  },
   "chat": {
     "maxLines": 12,
+    "showTime": false,
     "showPlatformTag": true,
-    "showPlatformColor": true,
-    "showTime": true
+    "showPlatformColor": false
   },
-  "viewers": {
-
-  },
-  "overlay": {
-  }
+  "viewers": {}
 }
