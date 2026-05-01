@@ -253,17 +253,31 @@ export class GameWorld {
         const message = payload?.message || "";
         const emotes = payload?.emotes || [];
 
+
         if (message.trim().startsWith('!fight')) {
             const parts = message.trim().split(/\s+/);
             if (parts.length >= 2) {
-                const targetNick = parts[1];
+                const targetNick = parts[1].trim().toLowerCase();
                 const attackerKey = `${platform}:${userName.trim().toLowerCase()}`;
-                const targetKey = `${platform}:${targetNick.trim().toLowerCase()}`;
 
                 const attacker = this.characters.get(attackerKey);
-                const target = this.characters.get(targetKey);
+                if (!attacker) return;
 
-                if (attacker && target && attacker !== target &&
+                let targetKey = `${platform}:${targetNick}`;
+                let target = this.characters.get(targetKey);
+
+                if (!target) {
+                    for (let [key, entry] of this.characters.entries()) {
+                        const nick = key.split(':')[1];
+                        if (nick === targetNick && key !== attackerKey) {
+                            targetKey = key;
+                            target = entry;
+                            break;
+                        }
+                    }
+                }
+
+                if (target && attacker !== target &&
                     !attacker.physics.isFighting && !target.physics.isFighting &&
                     attacker.physics.state !== 'Dead' && target.physics.state !== 'Dead') {
                     this._startFight(attackerKey, targetKey);
