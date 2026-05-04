@@ -12,8 +12,8 @@
   "chat": {
     "maxLines": 12,
     "showTime": false,
-    "showPlatformTag": true,
-    "showPlatformColor": false
+    "showPlatformTag": false,
+    "showPlatformColor": true
   },
   "viewers": {}
 }
