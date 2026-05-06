@@ -8,6 +8,7 @@
         this.bubbleEl = null;
         this.nicknameEl = null;
         this.bubbleTimeout = null;
+        this._inCombatFlag = false;
 
         // Приватные поля для отслеживания изменений
         this._currentState = null;
@@ -64,7 +65,7 @@
         this._addSvgContent();
 
         this.world.appendChild(this.container);
-        this.setState('Idle');
+        this.setState('idle');
     }
 
     setState(newState) {
@@ -96,6 +97,18 @@
             } else if (newDirection === 'left') {
                 svg.style.transform = 'scaleX(-1)';
             }
+        }
+    }
+
+    setInCombat(inCombat) {
+        if (!this.container) return;
+        if (inCombat === this._inCombatFlag) return;
+
+        this._inCombatFlag = inCombat;
+        if (inCombat) {
+            this.container.classList.add('inCombat');
+        } else {
+            this.container.classList.remove('inCombat');
         }
     }
 
@@ -210,6 +223,17 @@
         setTimeout(() => {
             if (el && el.parentNode) el.remove();
         }, 1000);
+    }
+
+    playAttackEffect() {
+        if (!this.container) return;
+
+        this.container.classList.remove('attacking');
+        this.container.classList.add('attacking');
+
+        setTimeout(() => {
+            if (this.container) this.container.classList.remove('attacking');
+        }, 600);
     }
 
 

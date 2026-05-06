@@ -59,8 +59,8 @@ export function addDebugPanel() {
         return input;
     }
 
-    const userInput = createField('user (string)', 'debug_user', 'samonewr');
-    const messageInput = createField('message (string)', 'debug_message', 'лут гоблин');
+    const userInput = createField('user (string)', 'debug_user', 'player1');
+    const messageInput = createField('message (string)', 'debug_message', '!figh');
     const colorInput = createField('color (hex)', 'debug_color', '');
     const platformInput = createField('platform (string)', 'debug_platform', 'twitch');
     const timeInput = createField('time (string, например 16:16)', 'debug_time', '16:16');

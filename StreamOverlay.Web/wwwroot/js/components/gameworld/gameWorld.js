@@ -14,11 +14,11 @@ class PhysicsSystem {
 
         if (physics.colliderX < 0) {
             physics.colliderX = 0;
-            if (!physics.isFighting && physics.state !== 'Dead') physics.vx *= -1;
+            if (!physics.isFighting && physics.state !== 'dead') physics.vx *= -1;
             else physics.vx = 0;
         } else if (physics.colliderX + physics.colliderWidth > worldWidth) {
             physics.colliderX = worldWidth - physics.colliderWidth;
-            if (!physics.isFighting && physics.state !== 'Dead') physics.vx *= -1;
+            if (!physics.isFighting && physics.state !== 'dead') physics.vx *= -1;
             else physics.vx = 0;
         }
 
@@ -35,8 +35,8 @@ class PhysicsSystem {
                     physics.vy = 0;
                     physics.isGrounded = true;
 
-                    if (!physics.isFighting && physics.state !== 'Dead') {
-                        physics.state = physics.vx === 0 ? 'Idle' : 'Walking';
+                    if (!physics.isFighting && physics.state !== 'dead') {
+                        physics.state = physics.vx === 0 ? 'idle' : 'walking';
                     }
                     break;
                 }
@@ -47,8 +47,8 @@ class PhysicsSystem {
             physics.colliderY = worldHeight - physics.colliderHeight;
             physics.vy = 0;
             physics.isGrounded = true;
-            if (!physics.isFighting && physics.state !== 'Dead') {
-                physics.state = physics.vx === 0 ? 'Idle' : 'Walking';
+            if (!physics.isFighting && physics.state !== 'dead') {
+                physics.state = physics.vx === 0 ? 'idle' : 'walking';
             }
         }
     }
@@ -56,7 +56,7 @@ class PhysicsSystem {
 
 class AISystem {
     static updateWandering(physics, walkSpeedPxPerFrame, config, delta) {
-        if (physics.state === 'Dead') return;
+        if (physics.state === 'dead') return;
 
         physics.actionTimer -= delta;
         if (physics.actionTimer <= 0 && physics.isGrounded) {
@@ -68,10 +68,10 @@ class AISystem {
             else if (rand < 0.8) {
                 physics.vy = config.JUMP_POWER;
                 physics.isGrounded = false;
-                physics.state = 'Jumping';
+                physics.state = 'jumping';
             } else {
                 physics.vx = 0;
-                physics.state = 'Idle';
+                physics.state = 'idle';
             }
         }
     }
@@ -80,9 +80,10 @@ class AISystem {
 class CombatSystem {
     static processFight(key, entry, characters, config, walkSpeedPxPerFrame, delta, now, worldWidth, onFightEnd) {
         const physics = entry.physics;
+        const renderer = entry.renderer;
         const target = characters.get(physics.fightTargetKey);
 
-        if (!target || target.physics.state === 'Dead') {
+        if (!target || target.physics.state === 'dead') {
             onFightEnd(key, physics.fightTargetKey);
             return;
         }
@@ -124,23 +125,35 @@ class CombatSystem {
         if (physics.fightCanAttack) {
             physics.fightAttackTimer += delta;
             if (physics.fightAttackTimer >= 1000) {
-                // Нанесение урона
-                const damagePercent = Math.random() * 0.30 + 0.01;
-                const damageMs = config.MAX_LIFETIME * damagePercent;
-                target.physics.dieTime -= damageMs;
+                // Запускаем анимацию удара
+                renderer.playAttackEffect();
 
-                const damageValue = Math.round(damagePercent * 100);
-                target.renderer.showDamage(damageValue);
+                setTimeout(() => {
+                    // Проверяем, что цель все еще существует и жива
+                    const currentTarget = characters.get(physics.fightTargetKey);
+                    if (!currentTarget || currentTarget.physics.state === 'dead') return;
 
-                if (target.renderer.playHitEffect) {
-                    target.renderer.playHitEffect();
-                }
+                    // Нанесение урона
+                    const damagePercent = Math.random() * 0.30 + 0.01;
+                    const damageMs = config.MAX_LIFETIME * damagePercent;
+                    currentTarget.physics.dieTime -= damageMs;
 
-                // Ход привника
+                    const damageValue = Math.round(damagePercent * 100);
+
+                    // Показываем хит-эффект и цифры урона
+                    if (currentTarget.renderer.playHitEffect) {
+                        currentTarget.renderer.playHitEffect();
+                    }
+                    currentTarget.renderer.showDamage(damageValue);
+
+                    // Ход противника
+                    physics.fightCanAttack = false;
+                    currentTarget.physics.fightCanAttack = true;
+                    currentTarget.physics.fightAttackTimer = 0;
+
+                }, 300); // Задержка 300мс (половина от 600ms анимации)
+
                 physics.fightAttackTimer = 0;
-                physics.fightCanAttack = false;
-                target.physics.fightCanAttack = true;
-                target.physics.fightAttackTimer = 0;
             }
         } else {
             physics.fightAttackTimer = 0;
@@ -166,7 +179,7 @@ export class GameWorld {
         this.platformsData = [];
 
         const defaultConfig = {
-            GRAVITY: 0.5,
+            GRAVITY: 0.4,
             JUMP_POWER: -8,
             WALK_SPEED_PERCENT_PER_SECOND: 5,
             CHAR_SIZE: 4,
@@ -279,7 +292,7 @@ export class GameWorld {
 
                 if (target && attacker !== target &&
                     !attacker.physics.isFighting && !target.physics.isFighting &&
-                    attacker.physics.state !== 'Dead' && target.physics.state !== 'Dead') {
+                    attacker.physics.state !== 'dead' && target.physics.state !== 'dead') {
                     this._startFight(attackerKey, targetKey);
                 }
             }
@@ -290,7 +303,7 @@ export class GameWorld {
 
         if (this.characters.has(key)) {
             const entry = this.characters.get(key);
-            if (!entry.physics.isFighting && entry.physics.state !== 'Dead') {
+            if (!entry.physics.isFighting && entry.physics.state !== 'dead') {
                 entry.physics.dieTime = Date.now() + this.config.MAX_LIFETIME;
                 entry.renderer.showHeal(100);
             }
@@ -309,7 +322,7 @@ export class GameWorld {
             let oldestKey = null;
             let minDieTime = Infinity;
             for (let [k, entry] of this.characters) {
-                if (entry.physics.state !== 'Dead' && entry.physics.dieTime < minDieTime) {
+                if (entry.physics.state !== 'dead' && entry.physics.dieTime < minDieTime) {
                     minDieTime = entry.physics.dieTime;
                     oldestKey = k;
                 }
@@ -338,7 +351,7 @@ export class GameWorld {
             fullWidth: fullSizePx,
             fullHeight: fullSizePx,
             vx: 0, vy: 0,
-            state: 'Idle',
+            state: 'idle',
             isGrounded: true,
             actionTimer: 1000,
             dieTime: Date.now() + this.config.MAX_LIFETIME,
@@ -391,6 +404,9 @@ export class GameWorld {
         charA.renderer.setWinner(false);
         charB.renderer.setWinner(false);
 
+        charA.renderer.setInCombat(true);
+        charB.renderer.setInCombat(true);
+
         // Поворот персонажей лицом друг к другу
         const centerA = charA.physics.colliderX + charA.physics.colliderWidth / 2;
         const centerB = charB.physics.colliderX + charB.physics.colliderWidth / 2;
@@ -420,7 +436,7 @@ export class GameWorld {
         const winner = this.characters.get(winnerKey);
         const loser = this.characters.get(loserKey);
 
-        if (winner && winner.physics.state !== 'Dead') {
+        if (winner && winner.physics.state !== 'dead') {
             const now = Date.now();
             const oldDieTime = winner.physics.dieTime;
             winner.physics.dieTime = now + this.config.MAX_LIFETIME;
@@ -434,6 +450,7 @@ export class GameWorld {
             // Восстанавление полного здоровья победителю
             winner.physics.dieTime = Date.now() + this.config.MAX_LIFETIME;
             winner.renderer.setWinner(true);
+            winner.renderer.setInCombat(false);
         }
 
         if (loser) {
@@ -443,12 +460,12 @@ export class GameWorld {
             loser.physics.fightAttackTimer = 0;
             loser.physics.fightCanAttack = false;
             loser.renderer.setWinner(false);
-
-            if (loser.physics.state !== 'Dead') {
-                loser.physics.state = 'Dead';
+            winner.renderer.setInCombat(false);
+            if (loser.physics.state !== 'dead') {
+                loser.physics.state = 'dead';
                 loser.physics.deadTimer = 10000;
                 loser.physics.vx = 0;
-                loser.renderer.setState('Dead');
+                loser.renderer.setState('dead');
                 loser.renderer.updateLifeBar(0);
             }
         }
@@ -539,7 +556,7 @@ export class GameWorld {
             const renderer = entry.renderer;
 
             // Состояние смерти
-            if (physics.state === 'Dead') {
+            if (physics.state === 'dead') {
                 physics.deadTimer -= delta;
                 if (physics.deadTimer <= 0) {
                     renderer.destroy(true);
@@ -557,10 +574,10 @@ export class GameWorld {
                 if (physics.isFighting && physics.fightTargetKey) {
                     this._endFight(physics.fightTargetKey, key);
                 }
-                physics.state = 'Dead';
+                physics.state = 'dead';
                 physics.deadTimer = 10000;
                 physics.vx = 0;
-                renderer.setState('Dead');
+                renderer.setState('dead');
                 renderer.updateLifeBar(0);
                 continue;
             }
@@ -586,7 +603,7 @@ export class GameWorld {
             // Анимация
             let visualState = physics.state;
             if (isFightingActive) {
-                visualState = physics.fightMoveToTarget ? 'Walking' : 'Fighting';
+                visualState = physics.fightMoveToTarget ? 'walking' : 'fighting';
             }
             renderer.setState(visualState);
             renderer.setDirection(physics.vx);

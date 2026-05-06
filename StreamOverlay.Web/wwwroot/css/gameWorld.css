@@ -6,33 +6,41 @@
     height: auto;
     aspect-ratio: 21 / 3;
     max-height: 70vh;
-    background-color: rgb(0,0,0, 0);
+    background-color: rgba(0, 0, 0, 0);
     box-sizing: unset;
 }
 
 .platform {
     position: absolute;
-/*    background-color: #216cc0;
-    border-top: 4px solid #80b5f0;
-    border-radius: 4px;
-    box-shadow: 0 4px 6px rgba(0,0,0,0.3);*/
+    /* Платформы визуально скрыты, но физически присутствуют */
 }
+
+/* === БАЗОВЫЕ СТИЛИ ПЕРСОНАЖЕЙ === */
 
 .character-container {
     position: absolute;
+    display: flex;
+    justify-content: center;
+    align-items: flex-end;
     will-change: transform;
     transition: none !important;
 }
+
 .character-collider {
     background: #ff0;
 }
+
 .svg-char {
-    width: 100%;
-    height: 100%;
+    position: absolute;
+    bottom: 0;
     overflow: visible !important;
 }
 
-.nickname, .life-bar-container, .bubble {
+/* === ЭЛЕМЕНТЫ ПЕРСОНАЖЕЙ === */
+
+.nickname,
+.life-bar-container,
+.bubble {
     position: absolute;
     left: 50%;
     transform: translateX(-50%);
@@ -40,7 +48,7 @@
 }
 
 .nickname {
-    bottom: 100%; 
+    bottom: 100%;
     margin-bottom: 0.8cqw;
     font-size: 1cqw;
     font-weight: 800;
@@ -55,14 +63,14 @@
     width: 4cqw;
     height: 0.4cqw;
     background: rgba(0, 0, 0, 0.5);
+    border: 1px solid #000;
     border-radius: 3px;
     overflow: hidden;
-    border: 1px solid #000;
 }
 
 .life-bar-fill {
-    height: 100%;
     width: 100%;
+    height: 100%;
     background: #2ecc71;
     transition: width 0.1s linear, background-color 0.5s;
 }
@@ -70,28 +78,22 @@
 .bubble {
     bottom: 100%;
     margin-bottom: 1.8cqw;
-    left: 50%;
-    transform: translateX(-50%);
-    position: absolute;
-    background: white;
-    color: #333;
-    padding: 0.3cqw 0.6cqw;
-    border-radius: 12px;
-    font-size: 0.8cqw;
-    font-weight: bold;
-    display: flex;
-    flex-direction: column;
-    justify-content: flex-end;
     min-width: 40px;
     max-width: 30.6cqw;
     width: max-content;
+    padding: 0.3cqw 0.6cqw;
+    background: white;
+    color: #333;
+    font-size: 0.8cqw;
+    font-weight: bold;
     white-space: normal;
     word-wrap: break-word;
-    box-shadow: 0 4px 8px rgba(0,0,0,0.2);
+    border-radius: 12px;
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
     transition: opacity 0.5s ease;
     z-index: 20;
-    pointer-events: none;
 }
+
     .bubble::after {
         content: '';
         position: absolute;
@@ -103,13 +105,9 @@
         border-top: 0.4cqw solid white;
     }
 
+/* === АНИМАЦИИ === */
 
-.Idle #Shell, .Idle #Head, .Idle #Belly, .Idle #Mask,
-.Walking #LegLeft, .Walking #LegRight, .Walking #HandLeft, .Walking #HandRight {
-    will-change: transform;
-}
-
-@keyframes idleBreath {
+@keyframes float-breathing {
     0%, 100% {
         transform: translateY(0);
     }
@@ -119,13 +117,17 @@
     }
 }
 
-.Idle {
-    #Shell, #Head, #Belly, #HandLeft, #HandRight, #Mask {
-        animation: idleBreath 1.2s ease-in-out infinite;
+@keyframes blink-animation {
+    0%, 95%, 100% {
+        opacity: 0;
+    }
+
+    97%, 99% {
+        opacity: 1;
     }
 }
 
-@keyframes swing {
+@keyframes walk-swing {
     0%, 100% {
         transform: rotate(-18deg);
     }
@@ -135,115 +137,162 @@
     }
 }
 
-.Walking {
-    #LegLeft, #LegRight, #HandLeft, #HandRight {
-        transform-box: fill-box;
-        transform-origin: 50% 0%;
-        animation: swing 0.35s ease-in-out infinite;
-    }
-    #HandLeft, #LegRight {
-        animation-delay: -0.175s;
-    }
-}
-
-.Jumping .svg-char {
-
-}
-
-
-.Fighting {
-    #HandRight {
-        transform-box: fill-box;
-        transform-origin: 50% 0%;
-        animation: strikeRight 0.35s ease-in-out infinite;
-    }
-
-    #HandLeft {
-        animation-delay: -0.175s;
-    }
-}
-
-@keyframes strikeRight {
-    0%, 100% {
-        transform: rotate(-150deg);
-    }
-
-    50% {
-        transform: rotate(-30deg);
-    }
-}
-
-.Fighting {
-    #HandLeft {
-        transform-box: fill-box;
-        transform-origin: 50% 0%;
-        animation: strikeLeft 0.35s ease-in-out infinite;
-    }
-
-    #HandLeft {
-        animation-delay: -0.175s;
-    }
-}
-
-@keyframes strikeLeft {
-    0%, 100% {
-        transform: rotate(-90deg);
-    }
-
-    50% {
-        transform: rotate(-30deg);
-    }
-}
-
-
-.winner {
-    filter: drop-shadow(0 0 5px gold);
-    animation: winnerGlow 0.5s infinite alternate;
-}
-
-.hit {
-    
-    filter: brightness(1.5);
-}
-
-@keyframes winnerGlow {
-    from {
-        filter: drop-shadow(0 0 5px gold);
-    }
-
-    to {
-        filter: drop-shadow(0 0 2px orange);
-    }
-}
-
-@keyframes hitShake {
+@keyframes weapon-attack {
     0% {
-        transform: translate(0, 0);
+        transform: rotate(0deg);
     }
 
-    25% {
-        transform: translate(3px, -2px);
+    30% {
+        transform: rotate(-150deg); /* Замах */
     }
 
-    75% {
-        transform: translate(-3px, 2px);
+    45% {
+        transform: rotate(0deg); /* Удар */
     }
 
     100% {
-        transform: translate(0, 0);
+        transform: rotate(0deg); /* Возврат */
     }
 }
-.Dead {
-    opacity: 0.5;
-    filter: grayscale(100%)
+
+@keyframes crown-float {
+    from {
+        transform: translateX(-50%) translateY(0);
+    }
+
+    to {
+        transform: translateX(-50%) translateY(-5px);
+    }
 }
 
+@keyframes damage-float {
+    0% {
+        opacity: 1;
+        transform: translateX(-50%) translateY(0);
+    }
 
+    100% {
+        opacity: 0;
+        transform: translateX(-50%) translateY(-50px);
+    }
+}
+
+/* === СОСТОЯНИЯ ПЕРСОНАЖА === */
+
+/* Покой и бой (общая анимация дыхания) */
+.idle #Shell,
+.idle #Head,
+.idle #Belly,
+.idle #HandLeft,
+.idle #HandRight,
+.idle #Mask,
+.idle #Eyelids,
+.fighting #Shell,
+.fighting #Head,
+.fighting #Belly,
+.fighting #HandLeft,
+.fighting #HandRight,
+.fighting #Mask,
+.fighting #Eyelids {
+    animation: float-breathing 1.2s ease-in-out infinite;
+    will-change: transform;
+}
+
+/* Моргание */
+#Eyelids {
+    opacity: 0;
+    animation: blink-animation 4s infinite;
+    will-change: opacity;
+}
+
+/* Ходьба */
+.walking #LegLeft,
+.walking #LegRight,
+.walking #HandLeft {
+    transform-box: fill-box;
+    transform-origin: 50% 0%;
+    animation: walk-swing 0.35s ease-in-out infinite;
+    will-change: transform;
+}
+
+.walking #HandRight {
+    transform-box: fill-box;
+    transform-origin: 0% 50%;
+    animation: walk-swing 0.35s ease-in-out infinite;
+    will-change: transform;
+}
+
+.walking #HandLeft,
+.walking #LegRight {
+    animation-delay: -0.175s;
+}
+
+/* Прыжок */
+.jumping .svg-char {
+}
+
+/* Смерть */
+.dead {
+    opacity: 0.5;
+    filter: grayscale(100%);
+}
+
+/* === БОЕВАЯ СИСТЕМА === */
+
+/* Оружие (по умолчанию скрыто) */
+#Weapon {
+    opacity: 0;
+    will-change: opacity;
+}
+
+.inCombat #Weapon {
+    opacity: 1;
+}
+
+/* Атака */
+.attacking #HandRight {
+    transform-box: fill-box;
+    transform-origin: 0% 50%;
+    animation: weapon-attack 0.6s ease-in-out 1;
+    will-change: transform;
+}
+
+/* Попадание */
+.hit {
+    filter: brightness(1.3);
+    animation: none;
+}
+
+/* Победитель */
+.winner {
+    position: relative;
+    will-change: filter;
+}
+
+    .winner::before {
+        content: "👑";
+        position: absolute;
+        bottom: 146%;
+        left: 50%;
+        transform: translateX(-50%);
+        font-size: 1cqw;
+        animation: crown-float 0.5s infinite alternate;
+        will-change: transform;
+    }
+
+/* Всплывающие числа (урон, отхил) */
 .float-number {
-    font-size: 24px;
+    position: absolute;
+    left: 50%;
+    top: 0;
+    transform: translateX(-50%);
+    font-size: 2cqw;
     font-weight: bold;
+    white-space: nowrap;
     text-shadow: 1px 1px 0 rgba(0, 0, 0, 0.5);
-    animation: floatUp 1s ease-out forwards;
+    animation: damage-float 1s ease-out forwards;
+    pointer-events: none;
+    z-index: 100;
     will-change: transform, opacity;
 }
 
@@ -254,15 +303,3 @@
     .float-number.heal {
         color: #55ff55;
     }
-
-@keyframes floatUp {
-    0% {
-        opacity: 1;
-        transform: translateX(-50%) translateY(0px);
-    }
-
-    100% {
-        opacity: 0;
-        transform: translateX(-50%) translateY(-50px);
-    }
-}

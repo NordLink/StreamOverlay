@@ -11,7 +11,9 @@ export default class TurtleRenderer extends BaseCharacterRenderer {
     async _addSvgContent() {
         if (!TurtleRenderer.svgTemplate) {
             try {
-                const response = await fetch('/assets/sprites/turtle.svg');
+                const timestamp = Date.now();
+                const response = await fetch(`/assets/sprites/turtle.svg?t=${timestamp}`); // откл кеш на время разработки
+                //const response = await fetch('/assets/sprites/turtle.svg');
                 const svgText = await response.text();
                 const parser = new DOMParser();
                 const doc = parser.parseFromString(svgText, 'image/svg+xml');
@@ -22,7 +24,7 @@ export default class TurtleRenderer extends BaseCharacterRenderer {
             }
         }
         const svgClone = TurtleRenderer.svgTemplate.cloneNode(true);
-        svgClone.style.width = '100%';
+        //svgClone.style.width = '100%';
         svgClone.style.height = '100%';
         svgClone.style.display = 'block';
         this.container.appendChild(svgClone);
