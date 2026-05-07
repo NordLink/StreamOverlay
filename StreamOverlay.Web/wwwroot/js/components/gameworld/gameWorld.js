@@ -265,51 +265,90 @@ export class GameWorld {
         const color = resolveMessageColor(payload);
         const message = payload?.message || "";
         const emotes = payload?.emotes || [];
+        const attackerKey = `${platform}:${userName.trim().toLowerCase()}`;
 
-
-        if (message.trim().startsWith('!fight')) {
+        if (message.trim().toLowerCase().startsWith('!дуэль')) {
+           
             const parts = message.trim().split(/\s+/);
-            if (parts.length >= 2) {
-                const targetNick = parts[1].trim().toLowerCase();
-                const attackerKey = `${platform}:${userName.trim().toLowerCase()}`;
+            const hasTarget = parts.length >= 2;
+            const targetNick = hasTarget ? parts[1].trim().toLowerCase() : null;
 
-                const attacker = this.characters.get(attackerKey);
-                if (!attacker) return;
-
-                let targetKey = `${platform}:${targetNick}`;
-                let target = this.characters.get(targetKey);
-
-                if (!target) {
-                    for (let [key, entry] of this.characters.entries()) {
-                        const nick = key.split(':')[1];
-                        if (nick === targetNick && key !== attackerKey) {
-                            targetKey = key;
-                            target = entry;
-                            break;
-                        }
-                    }
-                }
-
-                if (target && attacker !== target &&
-                    !attacker.physics.isFighting && !target.physics.isFighting &&
-                    attacker.physics.state !== 'dead' && target.physics.state !== 'dead') {
-                    this._startFight(attackerKey, targetKey);
+            let attacker = this.characters.get(attackerKey);
+            let isNew = false;
+            if (!attacker) {
+                const initialMessage = hasTarget ? `Внезапная атака на ${targetNick}` : "Введите никнейм цели";
+                this._createCharacter(attackerKey, color, userName, initialMessage, []);
+                attacker = this.characters.get(attackerKey);
+                isNew = true;
+            } else {
+                if (!attacker.physics.isFighting && attacker.physics.state !== 'dead') {
+                    attacker.physics.dieTime = Date.now() + this.config.MAX_LIFETIME;
+                    attacker.renderer.showHeal(100);
                 }
             }
+
+            if (!attacker) return;
+
+            if (!hasTarget) {
+                attacker.renderer.updateBubble("Введите никнейм цели");
+                return;
+            }
+
+            if (!isNew) {
+                this._updateCharacterBubble(attacker.renderer, `Вызываю на дуэль ${targetNick}`, []);
+            }
+
+            let targetKey = `${platform}:${targetNick}`;
+            let target = this.characters.get(targetKey);
+
+            if (!target) {
+                for (let [key, entry] of this.characters.entries()) {
+                    const nick = key.split(':')[1];
+                    if (nick === targetNick && key !== attackerKey) {
+                        targetKey = key;
+                        target = entry;
+                        break;
+                    }
+                }
+            }
+
+            if (!target || attacker === target) {
+                attacker.renderer.updateBubble("Цель не найдена");
+                return;
+            }
+
+            if (attacker.physics.isFighting) {
+                attacker.renderer.updateBubble("Вы уже в бою");
+                return;
+            }
+
+            if (attacker.physics.state === 'dead') {
+                return;
+            }
+
+            if (target.physics.state === 'dead') {
+                attacker.renderer.updateBubble("Цель мертва");
+                return;
+            }
+
+            if (target.physics.isFighting) {
+                attacker.renderer.updateBubble("Цель уже сражается");
+                return;
+            }
+
+            this._startFight(attackerKey, targetKey);
             return;
         }
 
-        const key = `${platform}:${userName.trim().toLowerCase()}`;
-
-        if (this.characters.has(key)) {
-            const entry = this.characters.get(key);
+        if (this.characters.has(attackerKey)) {
+            const entry = this.characters.get(attackerKey);
             if (!entry.physics.isFighting && entry.physics.state !== 'dead') {
                 entry.physics.dieTime = Date.now() + this.config.MAX_LIFETIME;
                 entry.renderer.showHeal(100);
             }
             this._updateCharacterBubble(entry.renderer, message, emotes);
         } else {
-            this._createCharacter(key, color, userName, message, emotes);
+            this._createCharacter(attackerKey, color, userName, message, emotes);
         }
     }
 
