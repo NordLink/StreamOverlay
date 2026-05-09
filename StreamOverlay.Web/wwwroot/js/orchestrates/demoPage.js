@@ -15,8 +15,6 @@ import { GameWorld } from '../components/gameworld/gameWorld.js';
         showPlatformColor: true
     });
 
-    const gameWorld = new GameWorld("world");
-    gameWorld.init();
 
     const logStatus = (connectionStatus) => {
         let statusText = connectionStatus;
@@ -27,6 +25,14 @@ import { GameWorld } from '../components/gameworld/gameWorld.js';
     };
 
     const streamHub = new ConnectionService("/chat-hub");
+
+    const gameWorld = new GameWorld("world", {}, (winner, loser, platform) => {
+        if (streamHub && streamHub.sendDuelResult) {
+            streamHub.sendDuelResult(winner, loser, platform);
+        }
+    });
+
+    gameWorld.init();
 
     streamHub.onChannelInfoCallback = (payload) => {
         const platform = (payload?.platform || "").toLowerCase();

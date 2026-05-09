@@ -1,12 +1,29 @@
-﻿import { GameWorld } from './components/gameworld/gameWorld.js';
+﻿import { ConnectionService } from './services/connectionService.js';
+import { GameWorld } from './components/gameworld/gameWorld.js';
 
+const streamHub = new ConnectionService("/chat-hub");
 
-const characterWorld = new GameWorld("world", {
-    character: 'turtle',
-    MAX_CHARACTERS: 8,
-    DEBUG_COLLIDER: false
-});
+const characterWorld = new GameWorld(
+    "world",
+    {
+        character: 'turtle',
+        MAX_CHARACTERS: 8,
+        DEBUG_COLLIDER: false
+    },
+    (winner, loser) => {
+        if (streamHub && streamHub.sendDuelResult) {
+            streamHub.sendDuelResult(winner, loser);
+        }
+    }
+);
+
 characterWorld.init();
+
+streamHub.onChatMessageCallback = (payload) => {
+    characterWorld.spawnFromMessage(payload);
+};
+
+streamHub.start();
 
 export function addDebugPanel() {
 
@@ -59,8 +76,8 @@ export function addDebugPanel() {
         return input;
     }
 
-    const userInput = createField('user (string)', 'debug_user', 'player1');
-    const messageInput = createField('message (string)', 'debug_message', '!figh');
+    const userInput = createField('user (string)', 'debug_user', '1');
+    const messageInput = createField('message (string)', 'debug_message', '!дуэль');
     const colorInput = createField('color (hex)', 'debug_color', '');
     const platformInput = createField('platform (string)', 'debug_platform', 'twitch');
     const timeInput = createField('time (string, например 16:16)', 'debug_time', '16:16');

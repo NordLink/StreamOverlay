@@ -1,4 +1,5 @@
 using DotNetEnv;
+using StreamOverlay.Web.Services.Broadcast;
 
 Env.Load();
 
@@ -47,6 +48,7 @@ builder.Services.AddHostedService<TwitchChatService>();
 builder.Services.AddHostedService<VkChatPollingService>();
 builder.Services.AddHostedService<VkViewerPollingService>();
 builder.Services.AddSingleton<IComponentConfigService, ComponentConfigService>();
+builder.Services.AddSingleton<IDuelResultService, DuelResultService>();
 
 var app = builder.Build();
 

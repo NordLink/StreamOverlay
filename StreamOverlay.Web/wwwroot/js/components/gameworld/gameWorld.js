@@ -125,33 +125,28 @@ class CombatSystem {
         if (physics.fightCanAttack) {
             physics.fightAttackTimer += delta;
             if (physics.fightAttackTimer >= 1000) {
-                // Запускаем анимацию удара
                 renderer.playAttackEffect();
 
                 setTimeout(() => {
-                    // Проверяем, что цель все еще существует и жива
                     const currentTarget = characters.get(physics.fightTargetKey);
                     if (!currentTarget || currentTarget.physics.state === 'dead') return;
 
-                    // Нанесение урона
                     const damagePercent = Math.random() * 0.30 + 0.01;
                     const damageMs = config.MAX_LIFETIME * damagePercent;
                     currentTarget.physics.dieTime -= damageMs;
 
                     const damageValue = Math.round(damagePercent * 100);
 
-                    // Показываем хит-эффект и цифры урона
                     if (currentTarget.renderer.playHitEffect) {
                         currentTarget.renderer.playHitEffect();
                     }
                     currentTarget.renderer.showDamage(damageValue);
 
-                    // Ход противника
                     physics.fightCanAttack = false;
                     currentTarget.physics.fightCanAttack = true;
                     currentTarget.physics.fightAttackTimer = 0;
 
-                }, 300); // Задержка 300мс (половина от 600ms анимации)
+                }, 300);
 
                 physics.fightAttackTimer = 0;
             }
@@ -159,7 +154,6 @@ class CombatSystem {
             physics.fightAttackTimer = 0;
         }
 
-        // Заморозка ИИ-поведения во время боя
         physics.actionTimer = 0;
         physics.isGrounded = true;
     }
@@ -168,7 +162,7 @@ class CombatSystem {
 // ГЛАВНЫЙ КЛАСС
 
 export class GameWorld {
-    constructor(elementId, customConfig = {}) {
+    constructor(elementId, customConfig = {}, onDuelEndCallback = null) {
         this.world = document.getElementById(elementId);
         if (!this.world) throw new Error(`Элемент с id "${elementId}" не был найден`);
 
@@ -193,6 +187,8 @@ export class GameWorld {
             character: 'turtle'
         };
         this.config = { ...defaultConfig, ...customConfig };
+
+        this.onDuelEndCallback = onDuelEndCallback;
 
         this.platformSettings = [
             { left: 87, top: 77.5, width: 13, height: 20 },
@@ -268,15 +264,16 @@ export class GameWorld {
         const attackerKey = `${platform}:${userName.trim().toLowerCase()}`;
 
         if (message.trim().toLowerCase().startsWith('!дуэль')) {
-           
             const parts = message.trim().split(/\s+/);
             const hasTarget = parts.length >= 2;
-            const targetNick = hasTarget ? parts[1].trim().toLowerCase() : null;
+            const targetNickOriginal = hasTarget ? parts[1].trim() : null;
+            const targetNickLower = hasTarget ? targetNickOriginal.toLowerCase() : null;
 
             let attacker = this.characters.get(attackerKey);
             let isNew = false;
             if (!attacker) {
-                const initialMessage = hasTarget ? `Внезапная атака на ${targetNick}` : "Введите никнейм цели";
+                // Временное сообщение, позже заменится, если цель найдена
+                const initialMessage = hasTarget ? `Внезапная атака на ${targetNickOriginal}` : "Введите никнейм цели";
                 this._createCharacter(attackerKey, color, userName, initialMessage, []);
                 attacker = this.characters.get(attackerKey);
                 isNew = true;
@@ -294,17 +291,14 @@ export class GameWorld {
                 return;
             }
 
-            if (!isNew) {
-                this._updateCharacterBubble(attacker.renderer, `Вызываю на дуэль ${targetNick}`, []);
-            }
-
-            let targetKey = `${platform}:${targetNick}`;
+            // Поиск цели
+            let targetKey = `${platform}:${targetNickLower}`;
             let target = this.characters.get(targetKey);
 
             if (!target) {
                 for (let [key, entry] of this.characters.entries()) {
                     const nick = key.split(':')[1];
-                    if (nick === targetNick && key !== attackerKey) {
+                    if (nick === targetNickLower && key !== attackerKey) {
                         targetKey = key;
                         target = entry;
                         break;
@@ -315,6 +309,15 @@ export class GameWorld {
             if (!target || attacker === target) {
                 attacker.renderer.updateBubble("Цель не найдена");
                 return;
+            }
+
+            // Отображение реального ника (из physics.nickname)
+            const targetDisplayNick = target.physics.nickname;
+
+            if (!isNew) {
+                this._updateCharacterBubble(attacker.renderer, `Вызываю на дуэль ${targetDisplayNick}`, []);
+            } else {
+                attacker.renderer.updateBubble(`Внезапная атака на ${targetDisplayNick}`);
             }
 
             if (attacker.physics.isFighting) {
@@ -399,7 +402,8 @@ export class GameWorld {
             fightMoveToTarget: false,
             fightAttackTimer: 0,
             fightCanAttack: false,
-            deadTimer: 0
+            deadTimer: 0,
+            nickname: nickname // FIX: сохраняем оригинальный ник
         };
 
         const characterType = this.config.character;
@@ -431,8 +435,6 @@ export class GameWorld {
         const charB = this.characters.get(keyB);
         if (!charA || !charB) return;
 
-
-        // Восстанавение полного здоровья обоим персонажам перед боем
         const now = Date.now();
         charA.physics.dieTime = now + this.config.MAX_LIFETIME;
         charB.physics.dieTime = now + this.config.MAX_LIFETIME;
@@ -446,7 +448,6 @@ export class GameWorld {
         charA.renderer.setInCombat(true);
         charB.renderer.setInCombat(true);
 
-        // Поворот персонажей лицом друг к другу
         const centerA = charA.physics.colliderX + charA.physics.colliderWidth / 2;
         const centerB = charB.physics.colliderX + charB.physics.colliderWidth / 2;
         if (centerA < centerB) {
@@ -486,7 +487,6 @@ export class GameWorld {
             winner.physics.fightMoveToTarget = false;
             winner.physics.fightAttackTimer = 0;
             winner.physics.fightCanAttack = false;
-            // Восстанавление полного здоровья победителю
             winner.physics.dieTime = Date.now() + this.config.MAX_LIFETIME;
             winner.renderer.setWinner(true);
             winner.renderer.setInCombat(false);
@@ -499,7 +499,7 @@ export class GameWorld {
             loser.physics.fightAttackTimer = 0;
             loser.physics.fightCanAttack = false;
             loser.renderer.setWinner(false);
-            winner.renderer.setInCombat(false);
+            loser.renderer.setInCombat(false);
             if (loser.physics.state !== 'dead') {
                 loser.physics.state = 'dead';
                 loser.physics.deadTimer = 10000;
@@ -507,6 +507,13 @@ export class GameWorld {
                 loser.renderer.setState('dead');
                 loser.renderer.updateLifeBar(0);
             }
+        }
+
+        // FIX: передаём в колбэк оригинальные ники из physics.nickname
+        if (this.onDuelEndCallback && winner && loser) {
+            const winnerNick = winner.physics.nickname;
+            const loserNick = loser.physics.nickname;
+            this.onDuelEndCallback(winnerNick, loserNick);
         }
     }
 
@@ -594,7 +601,6 @@ export class GameWorld {
             const physics = entry.physics;
             const renderer = entry.renderer;
 
-            // Состояние смерти
             if (physics.state === 'dead') {
                 physics.deadTimer -= delta;
                 if (physics.deadTimer <= 0) {
@@ -607,7 +613,6 @@ export class GameWorld {
                 continue;
             }
 
-            // Жизненный цикл
             const timeLeft = physics.dieTime - now;
             if (timeLeft <= 0) {
                 if (physics.isFighting && physics.fightTargetKey) {
@@ -624,7 +629,6 @@ export class GameWorld {
             const percent = Math.max(0, (timeLeft / this.config.MAX_LIFETIME) * 100);
             renderer.updateLifeBar(percent);
 
-            // Логика ИИ и боя
             let isFightingActive = physics.isFighting && physics.fightTargetKey;
             if (isFightingActive) {
                 CombatSystem.processFight(
@@ -636,10 +640,8 @@ export class GameWorld {
                 AISystem.updateWandering(physics, this.walkSpeedPxPerFrame, this.config, delta);
             }
 
-            // Физика
             PhysicsSystem.applyGravityAndMovement(physics, platforms, worldWidth, worldHeight, this.config);
 
-            // Анимация
             let visualState = physics.state;
             if (isFightingActive) {
                 visualState = physics.fightMoveToTarget ? 'walking' : 'fighting';
@@ -647,7 +649,6 @@ export class GameWorld {
             renderer.setState(visualState);
             renderer.setDirection(physics.vx);
 
-            // Позиционирование
             this._updateContainerPosition(renderer, physics);
             this._updateColliderBlockStyle(renderer, physics);
         }

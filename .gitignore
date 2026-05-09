@@ -24,3 +24,4 @@ publish/
 Thumbs.db
 .idea/
 *.sln.iml
+StreamOverlay.Web/Data/duelStats.json

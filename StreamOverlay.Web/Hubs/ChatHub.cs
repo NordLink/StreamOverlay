@@ -1,11 +1,16 @@
 ﻿using Microsoft.AspNetCore.SignalR;
+using StreamOverlay.Web.Services.Broadcast;
 public class ChatHub : Hub
 {
     private readonly OverlayStateService _stateService;
-    public ChatHub(OverlayStateService stateService)
+    private readonly IDuelResultService _duelResultService;
+
+    public ChatHub(OverlayStateService stateService, IDuelResultService duelResultService)
     {
         _stateService = stateService;
+        _duelResultService = duelResultService;
     }
+
     public override async Task OnConnectedAsync()
     {
         await base.OnConnectedAsync();
@@ -30,5 +35,11 @@ public class ChatHub : Hub
                 isLive = viewers.IsLive
             });
         }
+    }
+
+
+    public async Task ReceiveDuelResult(string winnerUsername, string loserUsername)
+    {
+        await _duelResultService.ProcessDuelResultAsync(winnerUsername, loserUsername);
     }
 }

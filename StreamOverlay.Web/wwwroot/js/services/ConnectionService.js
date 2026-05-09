@@ -41,4 +41,18 @@
             setTimeout(() => this.start(), 5000);
         }
     }
+
+    // Отправка результата дуэли на сервер
+    async sendDuelResult(winner, loser) {
+        if (this.connection.state === signalR.HubConnectionState.Connected) {
+            try {
+                await this.connection.invoke("ReceiveDuelResult", winner, loser);
+                console.log(`Результат дуэли: ${winner} vs ${loser} отправлен на сервер!`);
+            } catch (err) {
+                console.error("Ошибка отправки результата дуэли на сервер:", err);
+            }
+        } else {
+            console.warn("SignalR не подключен, невозможно отправить результат дуэли на сервер");
+        }
+    }
 }

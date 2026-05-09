@@ -9,7 +9,7 @@ public class ComponentConfigService : IComponentConfigService
 
     public ComponentConfigService(IHostEnvironment env)
     {
-        _filePath = Path.Combine(env.ContentRootPath, "componentConfig.json");
+        _filePath = Path.Combine(env.ContentRootPath, "Data", "componentConfig.json");
     }
 
     public async Task<string> GetConfigAsync()
