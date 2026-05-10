@@ -26,11 +26,16 @@ import { GameWorld } from '../components/gameworld/gameWorld.js';
 
     const streamHub = new ConnectionService("/chat-hub");
 
-    const gameWorld = new GameWorld("world", {}, (winner, loser, platform) => {
-        if (streamHub && streamHub.sendDuelResult) {
-            streamHub.sendDuelResult(winner, loser, platform);
-        }
-    });
+    const gameWorld = new GameWorld(
+        "world",
+        {},
+        (winner, loser) => {
+            if (streamHub && streamHub.sendDuelResult) {
+                streamHub.sendDuelResult(winner, loser);
+            }
+        },
+        streamHub
+    );
 
     gameWorld.init();
 

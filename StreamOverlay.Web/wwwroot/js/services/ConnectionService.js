@@ -7,13 +7,15 @@
 
         this.status = "CONNECTING";
 
-        // Коллбеки для событий (подписчики)
+        // Коллбеки для событий
         this.onChannelInfoCallback = null;
         this.onViewerCountCallback = null;
         this.onChatMessageCallback = null;
         this.onStatusChangeCallback = null;
+        this.onLeaderboardUpdateCallback = null;
         this._setupListeners();
     }
+
     _setupListeners() {
         this.connection.on("channelInfo", (payload) => {
             if (this.onChannelInfoCallback) this.onChannelInfoCallback(payload);
@@ -24,14 +26,23 @@
         this.connection.on("chatMessage", (payload) => {
             if (this.onChatMessageCallback) this.onChatMessageCallback(payload);
         });
+
+        this.connection.on("leaderboardUpdate", (data) => {
+            if (this.onLeaderboardUpdateCallback) {
+                this.onLeaderboardUpdateCallback(data);
+            }
+        });
+
         this.connection.onreconnecting(() => this._setStatus("RECONNECTING"));
         this.connection.onreconnected(() => this._setStatus("CONNECTED"));
         this.connection.onclose(() => this._setStatus("DISCONNECTED"));
     }
+
     _setStatus(newStatus) {
         this.status = newStatus;
         if (this.onStatusChangeCallback) this.onStatusChangeCallback(this.status);
     }
+
     async start() {
         try {
             await this.connection.start();
@@ -42,17 +53,29 @@
         }
     }
 
-    // Отправка результата дуэли на сервер
+    async requestLeaderboard() {
+        if (this.connection.state === signalR.HubConnectionState.Connected) {
+            try {
+                await this.connection.invoke("RequestLeaderboard");
+                console.log("Лидерборд запрошен");
+            } catch (err) {
+                console.error("Ошибка вызова RequestLeaderboard:", err);
+            }
+        } else {
+            console.warn("SignalR не подключен, невозможно запросить лидерборд");
+        }
+    }
+
     async sendDuelResult(winner, loser) {
         if (this.connection.state === signalR.HubConnectionState.Connected) {
             try {
                 await this.connection.invoke("ReceiveDuelResult", winner, loser);
-                console.log(`Результат дуэли: ${winner} vs ${loser} отправлен на сервер!`);
+                console.log(`Результат дуэли: ${winner} vs ${loser} отправлен`);
             } catch (err) {
-                console.error("Ошибка отправки результата дуэли на сервер:", err);
+                console.error("Ошибка отправки результата дуэли:", err);
             }
         } else {
-            console.warn("SignalR не подключен, невозможно отправить результат дуэли на сервер");
+            console.warn("SignalR не подключен");
         }
     }
 }

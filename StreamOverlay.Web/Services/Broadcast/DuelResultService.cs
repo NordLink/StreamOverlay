@@ -1,11 +1,13 @@
 ﻿using System.Text.Json;
 using System.Text.Json.Serialization;
+using Microsoft.AspNetCore.SignalR;
 
 namespace StreamOverlay.Web.Services.Broadcast
 {
     public interface IDuelResultService
     {
         Task ProcessDuelResultAsync(string winnerKey, string loserKey);
+        LeaderboardDto GetLeaderboard();
     }
 
     public class PlayerStats
@@ -26,20 +28,19 @@ namespace StreamOverlay.Web.Services.Broadcast
     public class DuelResultService : IDuelResultService
     {
         private readonly ILogger<DuelResultService> _logger;
+        private readonly IHubContext<ChatHub> _hubContext;   // добавлено
         private readonly string _statsFilePath;
         private readonly object _lock = new();
-
-        // Данные в памяти для быстрого доступа
         private StatsRoot _stats;
 
-        public DuelResultService(ILogger<DuelResultService> logger, IWebHostEnvironment env)
+        public DuelResultService(ILogger<DuelResultService> logger, IWebHostEnvironment env, IHubContext<ChatHub> hubContext)
         {
             _logger = logger;
+            _hubContext = hubContext;
             var dataDir = Path.Combine(env.ContentRootPath, "Data");
             if (!Directory.Exists(dataDir))
                 Directory.CreateDirectory(dataDir);
             _statsFilePath = Path.Combine(dataDir, "duelStats.json");
-
             _stats = LoadFromFile();
         }
 
@@ -78,7 +79,6 @@ namespace StreamOverlay.Web.Services.Broadcast
             }
         }
 
-        // Обновление статистики (вызывается под локом)
         private void UpdateStats(string winnerKey, string loserKey)
         {
             if (!_stats.PlayersStat.TryGetValue(winnerKey, out var winnerStats))
@@ -100,33 +100,69 @@ namespace StreamOverlay.Web.Services.Broadcast
 
             loserStats.Losses++;
             loserStats.CurrentStreak = 0;
-
         }
 
-        public Task ProcessDuelResultAsync(string winnerKey, string loserKey)
+        public LeaderboardDto GetLeaderboard()
+        {
+            lock (_lock)
+            {
+                _stats = LoadFromFile();
+
+                // Топ-5 по победам с указанием побед и поражений
+                var topWins = _stats.PlayersStat
+                    .OrderByDescending(kv => kv.Value.Wins)
+                    .Take(5)
+                    .Select(kv => new LeaderboardEntryDto
+                    {
+                        Name = kv.Key,
+                        Wins = kv.Value.Wins,
+                        Losses = kv.Value.Losses 
+                    })
+                    .ToList();
+
+                var topStreakPlayer = _stats.PlayersStat
+                 .OrderByDescending(kv => kv.Value.BestStreak)
+                 .FirstOrDefault();
+
+                LeaderboardEntryDto topStreak = null;
+                if (topStreakPlayer.Value != null)
+                {
+                    topStreak = new LeaderboardEntryDto
+                    {
+                        Name = topStreakPlayer.Key,
+                        Wins = topStreakPlayer.Value.BestStreak
+                    };
+                }
+
+                return new LeaderboardDto
+                {
+                    TopWins = topWins,
+                    TopStreak = topStreak
+                };
+            }
+        }
+
+        public async Task ProcessDuelResultAsync(string winnerKey, string loserKey)
         {
             if (string.IsNullOrEmpty(winnerKey) || string.IsNullOrEmpty(loserKey) || winnerKey == loserKey)
             {
                 _logger.LogWarning("Недействительный результат дуэли: winner={Winner}, loser={Loser}", winnerKey, loserKey);
-                return Task.CompletedTask;
+                return;
             }
 
             lock (_lock)
             {
-                // Перезагружаем на случай внешних изменений (если другой процесс редактировал файл)
                 _stats = LoadFromFile();
-
                 UpdateStats(winnerKey, loserKey);
-
-                var winnerStats = _stats.PlayersStat[winnerKey];
-                _logger.LogInformation("Дуэль: победитель {Winner} (винстрик {Streak}) проигравший {Loser}",
-                    winnerKey, winnerStats.CurrentStreak, loserKey);
-                Console.WriteLine($"Результат дуэли сохранен: {winnerKey} (винстрик {winnerStats.CurrentStreak}) побежден {loserKey}");
-
                 SaveToFile();
             }
 
-            return Task.CompletedTask;
+            var leaderboard = GetLeaderboard();
+            await _hubContext.Clients.All.SendAsync("leaderboardUpdate", leaderboard);
+
+            var winnerStats = _stats.PlayersStat[winnerKey];
+            _logger.LogInformation("Дуэль: победитель {Winner} (винстрик {Streak}) проигравший {Loser}",
+                winnerKey, winnerStats.CurrentStreak, loserKey);
         }
     }
 }

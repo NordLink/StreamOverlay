@@ -162,7 +162,7 @@ class CombatSystem {
 // ГЛАВНЫЙ КЛАСС
 
 export class GameWorld {
-    constructor(elementId, customConfig = {}, onDuelEndCallback = null) {
+    constructor(elementId, customConfig = {}, onDuelEndCallback = null, connectionService = null) {
         this.world = document.getElementById(elementId);
         if (!this.world) throw new Error(`Элемент с id "${elementId}" не был найден`);
 
@@ -180,7 +180,7 @@ export class GameWorld {
             COLLIDER_WIDTH_PERCENT: 50,
             DEBUG_COLLIDER: false,
             WORLD_HEIGHT: 400,
-            MAX_LIFETIME: 7200000,
+            MAX_LIFETIME: 900000, // 15 минут
             MAX_CHARACTERS: 20,
             MAX_MESSAGE_LENGTH: 160,
             TARGET_FPS: 60,
@@ -203,6 +203,9 @@ export class GameWorld {
         this.walkSpeedPxPerFrame = 0;
         this._lastTimestamp = 0;
 
+        this.connectionService = connectionService;   // сохраняем
+        this.leaderboardElement = null;                // контейнер таблички
+
         this._animationLoop = this._animationLoop.bind(this);
         this._handleResize = this._handleResize.bind(this);
     }
@@ -215,7 +218,103 @@ export class GameWorld {
         this._createPlatforms(this.platformSettings);
         this._updateSpeedScale();
         window.addEventListener('resize', this._handleResize);
+
+        this._createLeaderboardElement();
+        this._setupLeaderboardUpdates();
+
         requestAnimationFrame(this._animationLoop);
+    }
+
+    _createLeaderboardElement() {
+        this.leaderboardElement = document.createElement('div');
+        this.leaderboardElement.className = 'game-leaderboard';
+        this.world.appendChild(this.leaderboardElement);
+        this.leaderboardElement.innerHTML = '<div class="loading">📊 Загрузка...</div>';
+    }
+
+    _setupLeaderboardUpdates() {
+        if (!this.connectionService) return;
+
+        this.connectionService.onLeaderboardUpdateCallback = (data) => {
+            this.renderLeaderboard(data);
+        };
+
+        this._waitForConnectionAndRequest();
+    }
+
+    async _waitForConnectionAndRequest() {
+        for (let i = 0; i < 20; i++) {
+            if (this.connectionService.status === 'CONNECTED') {
+                await this.connectionService.requestLeaderboard();
+                return;
+            }
+            await new Promise(resolve => setTimeout(resolve, 500));
+        }
+        console.warn("Не удалось запросить лидерборд: таймаут соединения");
+        if (this.leaderboardElement) {
+            this.leaderboardElement.innerHTML = '<div class="error">⚠️ Топ временно недоступен</div>';
+        }
+    }
+
+    renderLeaderboard(data) {
+        if (!this.leaderboardElement) return;
+
+        let html = `<div class="leaderboard-header">🏆 ЛУЧШИЕ БОЙЦЫ</div>`;
+        html += `<div class="leaderboard-table">
+                <div class="table-header">
+                    <span class="col-place">#</span>
+                    <span class="col-name">Игрок</span>
+                    <span class="col-wins">В</span>
+                    <span class="col-losses">П</span>
+                    <span class="col-total">И</span>
+                    <span class="col-diff">+/-</span>
+                </div>`;
+
+        if (data.topWins && data.topWins.length) {
+            data.topWins.forEach((entry, index) => {
+                const displayName = this._getDisplayName(entry.name);
+                const total = entry.wins + entry.losses;
+                const diff = entry.wins - entry.losses;
+                const diffClass = diff >= 0 ? 'positive' : 'negative';
+                const diffSign = diff > 0 ? '+' : '';
+
+                html += `<div class="table-row">
+                        <span class="col-place">${index + 1}</span>
+                        <span class="col-name" title="${this._escapeHtml(displayName)}">${this._escapeHtml(displayName)}</span>
+                        <span class="col-wins">${entry.wins}</span>
+                        <span class="col-losses">${entry.losses}</span>
+                        <span class="col-total">${total}</span>
+                        <span class="col-diff ${diffClass}">${diffSign}${diff}</span>
+                     </div>`;
+            });
+        } else {
+            html += `<div class="empty">Нет данных</div>`;
+        }
+
+        html += `</div>`;
+
+        if (data.topStreak.wins > 1) {
+            const streakName = this._getDisplayName(data.topStreak.name);
+            html += `<div class="streak-row">
+                    🔥Топ винстрик: <strong>${this._escapeHtml(streakName)}</strong> <span class="streak-count">${data.topStreak.wins}</span>
+                 </div>`;
+        }
+
+        this.leaderboardElement.innerHTML = html;
+    }
+
+    _getDisplayName(fullKey) {
+        const parts = fullKey.split(':');
+        return parts.length > 1 ? parts[1] : fullKey;
+    }
+
+    _escapeHtml(str) {
+        return str.replace(/[&<>]/g, function (m) {
+            if (m === '&') return '&amp;';
+            if (m === '<') return '&lt;';
+            if (m === '>') return '&gt;';
+            return m;
+        });
     }
 
     _updateSpeedScale() {

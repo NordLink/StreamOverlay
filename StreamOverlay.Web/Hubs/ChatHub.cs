@@ -1,5 +1,6 @@
 ﻿using Microsoft.AspNetCore.SignalR;
 using StreamOverlay.Web.Services.Broadcast;
+
 public class ChatHub : Hub
 {
     private readonly OverlayStateService _stateService;
@@ -14,7 +15,6 @@ public class ChatHub : Hub
     public override async Task OnConnectedAsync()
     {
         await base.OnConnectedAsync();
-        // Получить состояние из общего сервиса
         if (_stateService.LastChannelInfo != null)
         {
             var info = _stateService.LastChannelInfo;
@@ -36,7 +36,11 @@ public class ChatHub : Hub
             });
         }
     }
-
+    public async Task RequestLeaderboard()
+    {
+        var data = _duelResultService.GetLeaderboard();
+        await Clients.Caller.SendAsync("leaderboardUpdate", data);
+    }
 
     public async Task ReceiveDuelResult(string winnerUsername, string loserUsername)
     {

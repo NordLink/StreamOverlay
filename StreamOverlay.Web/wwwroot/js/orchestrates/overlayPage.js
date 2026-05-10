@@ -11,10 +11,19 @@ import { GameWorld } from '../components/gameworld/gameWorld.js';
 
     const header = new ChannelHeader("channel-name", config.channelHeader);
 
-    const gameWorld = new GameWorld("world", config.overlay.gameWorld);
-    gameWorld.init();
-
     const streamHub = new ConnectionService("/chat-hub");
+
+    const gameWorld = new GameWorld(
+        "world",
+        {},
+        (winner, loser) => {
+            if (streamHub && streamHub.sendDuelResult) {
+                streamHub.sendDuelResult(winner, loser);
+            }
+        },
+        streamHub
+    );
+    gameWorld.init();
 
     streamHub.onChannelInfoCallback = (payload) => {
         const platform = (payload?.platform || "").toLowerCase();

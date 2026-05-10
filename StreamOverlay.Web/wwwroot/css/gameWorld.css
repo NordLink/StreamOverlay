@@ -303,3 +303,100 @@
     .float-number.heal {
         color: #55ff55;
     }
+
+/*ЛиберБорд*/
+
+.game-leaderboard {
+    position: absolute;
+    top: 8%;
+    left: 28.5%;
+    padding: 0.6cqw 0.6cqw;
+    font-family: 'Segoe UI', 'Courier New', monospace;
+    font-size: 0.8cqw;
+    font-weight: normal;
+    z-index: 0;
+    width: 17.5%;
+    text-align: left;
+}
+
+.leaderboard-header {
+    color: #ffd966;
+    font-size: 0.6cqw;
+    font-weight: bold;
+    text-align: center;
+    padding-bottom: 0.1cqw;
+    margin-bottom: 0cqw;
+}
+
+.leaderboard-table {
+    width: 100%;
+}
+
+.table-header, .table-row {
+    display: flex;
+    justify-content: space-between;
+    padding: 0.1cqw 0;
+    border-bottom: 0.1cqw solid rgba(255, 170, 51, 0.2);
+}
+
+.table-header {
+    font-weight: bold;
+    color: #999;
+    border-bottom: 0.1cqw solid #999;
+    margin-bottom: 0.2cqw;
+}
+
+.col-place {
+    width: 2cqw;
+    text-align: center;
+}
+
+.col-name {
+    flex: 10cqw;
+    text-align: left;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.col-wins, .col-losses, .col-total, .col-diff {
+    min-width: 2cqw;
+    text-align: center;
+}
+
+.positive {
+    color: #88ff88;
+    font-weight: bold;
+}
+
+.negative {
+    color: #ff8888;
+    font-weight: bold;
+}
+
+.streak-row {
+    padding-top: 0.2cqw;
+    border-top: 0.1cqw dashed #999;
+    text-align: center;
+}
+
+.streak-row strong {
+    display: inline-block;
+    vertical-align: bottom;
+    max-width: 8cqw;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.streak-count {
+    color: #ffcc00;
+    font-weight: bold;
+}
+
+.loading, .error, .empty {
+    text-align: center;
+    color: #cccccc;
+    font-style: italic;
+    padding: 8px 0;
+}

@@ -14,7 +14,8 @@ const characterWorld = new GameWorld(
         if (streamHub && streamHub.sendDuelResult) {
             streamHub.sendDuelResult(winner, loser);
         }
-    }
+    },
+    streamHub
 );
 
 characterWorld.init();
