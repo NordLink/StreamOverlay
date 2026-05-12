@@ -16,9 +16,15 @@ import { GameWorld } from '../components/gameworld/gameWorld.js';
     const gameWorld = new GameWorld(
         "world",
         {},
-        (winner, loser) => {
+        (duelResult) => {
             if (streamHub && streamHub.sendDuelResult) {
-                streamHub.sendDuelResult(winner, loser);
+                streamHub.sendDuelResult(
+                    duelResult.winner,
+                    duelResult.winnerColor,
+                    duelResult.loser,
+                    duelResult.loserColor,
+                    duelResult.timestamp
+                );
             }
         },
         streamHub

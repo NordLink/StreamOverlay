@@ -6,7 +6,7 @@ namespace StreamOverlay.Web.Services.Broadcast
 {
     public interface IDuelResultService
     {
-        Task ProcessDuelResultAsync(string winnerKey, string loserKey);
+        Task ProcessDuelResultAsync(string winnerKey, string loserKey, string winnerColor, string loserColor, DateTime duelTime);
         LeaderboardDto GetLeaderboard();
     }
 
@@ -14,9 +14,13 @@ namespace StreamOverlay.Web.Services.Broadcast
     {
         public int Wins { get; set; }
         public int Losses { get; set; }
+
+        [JsonIgnore]
         public int TotalDuels { get => Wins + Losses; }
         public int CurrentStreak { get; set; }
         public int BestStreak { get; set; }
+        public string? Color { get; set; } 
+        public DateTime? LastDuelDate { get; set; }
     }
 
     public class StatsRoot
@@ -28,7 +32,7 @@ namespace StreamOverlay.Web.Services.Broadcast
     public class DuelResultService : IDuelResultService
     {
         private readonly ILogger<DuelResultService> _logger;
-        private readonly IHubContext<ChatHub> _hubContext;   // добавлено
+        private readonly IHubContext<ChatHub> _hubContext; 
         private readonly string _statsFilePath;
         private readonly object _lock = new();
         private StatsRoot _stats;
@@ -79,7 +83,7 @@ namespace StreamOverlay.Web.Services.Broadcast
             }
         }
 
-        private void UpdateStats(string winnerKey, string loserKey)
+        private void UpdateStats(string winnerKey, string loserKey, string winnerColor, string loserColor, DateTime duelTime)
         {
             if (!_stats.PlayersStat.TryGetValue(winnerKey, out var winnerStats))
             {
@@ -100,6 +104,11 @@ namespace StreamOverlay.Web.Services.Broadcast
 
             loserStats.Losses++;
             loserStats.CurrentStreak = 0;
+
+            winnerStats.Color = winnerColor;
+            loserStats.Color = loserColor;
+            winnerStats.LastDuelDate = duelTime;
+            loserStats.LastDuelDate = duelTime;
         }
 
         public LeaderboardDto GetLeaderboard()
@@ -108,7 +117,6 @@ namespace StreamOverlay.Web.Services.Broadcast
             {
                 _stats = LoadFromFile();
 
-                // Топ-5 по победам с указанием побед и поражений
                 var topWins = _stats.PlayersStat
                     .OrderByDescending(kv => kv.Value.Wins)
                     .Take(5)
@@ -116,44 +124,49 @@ namespace StreamOverlay.Web.Services.Broadcast
                     {
                         Name = kv.Key,
                         Wins = kv.Value.Wins,
-                        Losses = kv.Value.Losses 
+                        Losses = kv.Value.Losses,
+                        Color = kv.Value.Color,
+                        LastDuelDate = kv.Value.LastDuelDate
+                        // TotalDuels и WinRate вычисляются автоматически из геттеров
                     })
                     .ToList();
 
-                var topStreakPlayer = _stats.PlayersStat
-                 .OrderByDescending(kv => kv.Value.BestStreak)
-                 .FirstOrDefault();
-
-                LeaderboardEntryDto topStreak = null;
-                if (topStreakPlayer.Value != null)
-                {
-                    topStreak = new LeaderboardEntryDto
+                var topStreaks = _stats.PlayersStat
+                    .Where(kv => kv.Value.BestStreak > 0)          
+                    .GroupBy(kv => kv.Value.BestStreak)            
+                    .OrderByDescending(g => g.Key)           
+                    .Take(3)
+                    .Select(g => new LeaderboardStreakGroupDto
                     {
-                        Name = topStreakPlayer.Key,
-                        Wins = topStreakPlayer.Value.BestStreak
-                    };
-                }
+                        Wins = g.Key,
+                        Players = g.Select(kv => new LeaderboardStreakPlayerDto
+                        {
+                            Name = kv.Key,
+                            Color = kv.Value.Color ?? "#ffffff"
+                        }).ToList()
+                    })
+                    .ToList();
 
                 return new LeaderboardDto
                 {
                     TopWins = topWins,
-                    TopStreak = topStreak
+                    TopStreaks = topStreaks
                 };
             }
         }
 
-        public async Task ProcessDuelResultAsync(string winnerKey, string loserKey)
+        public async Task ProcessDuelResultAsync(string winnerKey, string loserKey, string winnerColor, string loserColor, DateTime duelTime)
         {
             if (string.IsNullOrEmpty(winnerKey) || string.IsNullOrEmpty(loserKey) || winnerKey == loserKey)
             {
-                _logger.LogWarning("Недействительный результат дуэли: winner={Winner}, loser={Loser}", winnerKey, loserKey);
+                _logger.LogWarning("Недействительный результат дуэли");
                 return;
             }
 
             lock (_lock)
             {
                 _stats = LoadFromFile();
-                UpdateStats(winnerKey, loserKey);
+                UpdateStats(winnerKey, loserKey, winnerColor, loserColor, duelTime);
                 SaveToFile();
             }
 

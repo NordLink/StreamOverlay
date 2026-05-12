@@ -316,6 +316,7 @@
     font-weight: normal;
     z-index: 0;
     width: 17.5%;
+    height: 80%;
     text-align: left;
 }
 
@@ -329,6 +330,7 @@
 }
 
 .leaderboard-table {
+    margin-top: 8%;
     width: 100%;
 }
 
@@ -357,6 +359,7 @@
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
+    font-weight: bold;
 }
 
 .col-wins, .col-losses, .col-total, .col-diff {
@@ -366,32 +369,10 @@
 
 .positive {
     color: #88ff88;
-    font-weight: bold;
 }
 
 .negative {
     color: #ff8888;
-    font-weight: bold;
-}
-
-.streak-row {
-    padding-top: 0.2cqw;
-    border-top: 0.1cqw dashed #999;
-    text-align: center;
-}
-
-.streak-row strong {
-    display: inline-block;
-    vertical-align: bottom;
-    max-width: 8cqw;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-}
-
-.streak-count {
-    color: #ffcc00;
-    font-weight: bold;
 }
 
 .loading, .error, .empty {
@@ -399,4 +380,31 @@
     color: #cccccc;
     font-style: italic;
     padding: 8px 0;
+}
+
+.ticker-container {
+    position: absolute;
+    overflow: hidden;
+    white-space: nowrap;
+    top: 14%;
+    left: 0.5cqw;
+    right: 0.5cqw;
+    font-weight: bold;
+    width: 95%;
+}
+
+.ticker-text {
+    display: inline-block;
+    animation: ticker-scroll 20s linear infinite;
+    padding-left: 100%; 
+}
+
+@keyframes ticker-scroll {
+    0% {
+        transform: translateX(0);
+    }
+
+    100% {
+        transform: translateX(-100%);
+    }
 }

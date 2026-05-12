@@ -42,8 +42,10 @@ public class ChatHub : Hub
         await Clients.Caller.SendAsync("leaderboardUpdate", data);
     }
 
-    public async Task ReceiveDuelResult(string winnerUsername, string loserUsername)
+
+    public async Task ReceiveDuelResult(string winner, string winnerColor, string loser, string loserColor, long timestamp)
     {
-        await _duelResultService.ProcessDuelResultAsync(winnerUsername, loserUsername);
+        var duelTime = DateTimeOffset.FromUnixTimeMilliseconds(timestamp).UtcDateTime;
+        await _duelResultService.ProcessDuelResultAsync(winner, loser, winnerColor, loserColor, duelTime);
     }
 }

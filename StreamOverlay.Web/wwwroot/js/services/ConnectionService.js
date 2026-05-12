@@ -57,7 +57,6 @@
         if (this.connection.state === signalR.HubConnectionState.Connected) {
             try {
                 await this.connection.invoke("RequestLeaderboard");
-                console.log("Лидерборд запрошен");
             } catch (err) {
                 console.error("Ошибка вызова RequestLeaderboard:", err);
             }
@@ -66,10 +65,10 @@
         }
     }
 
-    async sendDuelResult(winner, loser) {
+    async sendDuelResult(winner, winnerColor, loser, loserColor, timestamp) {
         if (this.connection.state === signalR.HubConnectionState.Connected) {
             try {
-                await this.connection.invoke("ReceiveDuelResult", winner, loser);
+                await this.connection.invoke("ReceiveDuelResult", winner, winnerColor, loser, loserColor, timestamp);
                 console.log(`Результат дуэли: ${winner} vs ${loser} отправлен`);
             } catch (err) {
                 console.error("Ошибка отправки результата дуэли:", err);

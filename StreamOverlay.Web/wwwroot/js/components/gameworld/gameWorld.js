@@ -203,8 +203,8 @@ export class GameWorld {
         this.walkSpeedPxPerFrame = 0;
         this._lastTimestamp = 0;
 
-        this.connectionService = connectionService;   // сохраняем
-        this.leaderboardElement = null;                // контейнер таблички
+        this.connectionService = connectionService; 
+        this.leaderboardElement = null;              
 
         this._animationLoop = this._animationLoop.bind(this);
         this._handleResize = this._handleResize.bind(this);
@@ -259,33 +259,32 @@ export class GameWorld {
     renderLeaderboard(data) {
         if (!this.leaderboardElement) return;
 
-        let html = `<div class="leaderboard-header">🏆 ЛУЧШИЕ БОЙЦЫ</div>`;
+        let html = `<div class="leaderboard-header">🏆 ЛУЧШИЕ ГЛАДИАТОРЫ</div>`;
         html += `<div class="leaderboard-table">
-                <div class="table-header">
-                    <span class="col-place">#</span>
-                    <span class="col-name">Игрок</span>
-                    <span class="col-wins">В</span>
-                    <span class="col-losses">П</span>
-                    <span class="col-total">И</span>
-                    <span class="col-diff">+/-</span>
-                </div>`;
+            <div class="table-header">
+                <span class="col-place">#</span>
+                <span class="col-name">Игрок</span>
+                <span class="col-wins">В</span>
+                <span class="col-losses">П</span>
+                <span class="col-total">И</span>
+                <span class="col-diff">%</span>
+            </div>`;
 
         if (data.topWins && data.topWins.length) {
             data.topWins.forEach((entry, index) => {
                 const displayName = this._getDisplayName(entry.name);
-                const total = entry.wins + entry.losses;
-                const diff = entry.wins - entry.losses;
-                const diffClass = diff >= 0 ? 'positive' : 'negative';
-                const diffSign = diff > 0 ? '+' : '';
+                const winrateFormatted = Math.round(entry.winRate); // уже готовый процент
+                const winrateClass = winrateFormatted >= 50 ? 'positive' : 'negative';
+                const nameStyle = entry.color ? `style="color: ${entry.color}"` : '';
 
                 html += `<div class="table-row">
-                        <span class="col-place">${index + 1}</span>
-                        <span class="col-name" title="${this._escapeHtml(displayName)}">${this._escapeHtml(displayName)}</span>
-                        <span class="col-wins">${entry.wins}</span>
-                        <span class="col-losses">${entry.losses}</span>
-                        <span class="col-total">${total}</span>
-                        <span class="col-diff ${diffClass}">${diffSign}${diff}</span>
-                     </div>`;
+        <span class="col-place">${index + 1}</span>
+        <span class="col-name" ${nameStyle} title="${this._escapeHtml(displayName)}">${this._escapeHtml(displayName)}</span>
+        <span class="col-wins">${entry.wins}</span>
+        <span class="col-losses">${entry.losses}</span>
+        <span class="col-total">${entry.totalDuels}</span>
+        <span class="col-diff ${winrateClass}">${winrateFormatted}</span>
+    </div>`;
             });
         } else {
             html += `<div class="empty">Нет данных</div>`;
@@ -293,11 +292,38 @@ export class GameWorld {
 
         html += `</div>`;
 
-        if (data.topStreak.wins > 1) {
-            const streakName = this._getDisplayName(data.topStreak.name);
-            html += `<div class="streak-row">
-                    🔥Топ винстрик: <strong>${this._escapeHtml(streakName)}</strong> <span class="streak-count">${data.topStreak.wins}</span>
-                 </div>`;
+        if (data.topStreaks && data.topStreaks.length) {
+    
+            const validStreaks = data.topStreaks.filter(group => group.wins > 0);
+            if (validStreaks.length) {
+                let tickerText = '🔥 ТОП ВИНСТРИКИ ЗА ВСЁ ВРЕМЯ 🔥 • ';
+                validStreaks.forEach((group, idx) => {
+                    const playersHtml = group.players.map(player => {
+                        const displayName = this._getDisplayName(player.name);
+                        const colorStyle = player.color ? `style="color: ${player.color}"` : '';
+                        return `<span ${colorStyle}>${this._escapeHtml(displayName)}</span>`;
+                    }).join(', ');
+
+                    let medal = '';
+                    if (idx === 0) medal = '🥇 1е место: ';
+                    else if (idx === 1) medal = '🥈 2е место: ';
+                    else if (idx === 2) medal = '🥉 3е место: ';
+                    tickerText += `${medal}${playersHtml} — ${group.wins} подряд • `;
+                });
+                tickerText = tickerText.slice(0, -3);
+                html += `<div class="ticker-container">
+                <div class="ticker-text">${tickerText}</div>
+             </div>`;
+            }
+        } else {
+       
+            if (data.topStreak && data.topStreak.wins > 0) {
+                const streakName = this._getDisplayName(data.topStreak.name);
+                const tickerText = `🔥 Топ винстрик: ${streakName} — ${data.topStreak.wins} подряд`;
+                html += `<div class="ticker-container">
+                        <div class="ticker-text">${this._escapeHtml(tickerText)}</div>
+                     </div>`;
+            }
         }
 
         this.leaderboardElement.innerHTML = html;
@@ -390,7 +416,6 @@ export class GameWorld {
                 return;
             }
 
-            // Поиск цели
             let targetKey = `${platform}:${targetNickLower}`;
             let target = this.characters.get(targetKey);
 
@@ -612,7 +637,16 @@ export class GameWorld {
         if (this.onDuelEndCallback && winner && loser) {
             const winnerNick = winner.physics.nickname;
             const loserNick = loser.physics.nickname;
-            this.onDuelEndCallback(winnerNick, loserNick);
+            const winnerColor = winner.renderer.options.color;
+            const loserColor = loser.renderer.options.color;
+            const timestamp = Date.now();                        
+            this.onDuelEndCallback({
+                winner: winnerNick,
+                winnerColor: winnerColor,
+                loser: loserNick,
+                loserColor: loserColor,
+                timestamp: timestamp
+            });
         }
     }
 
