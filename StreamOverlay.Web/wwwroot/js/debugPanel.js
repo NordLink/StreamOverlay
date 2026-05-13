@@ -10,14 +10,16 @@ const characterWorld = new GameWorld(
         MAX_CHARACTERS: 8,
         DEBUG_COLLIDER: false
     },
-    (duelResult) => {
+    (duelData) => {
         if (streamHub && streamHub.sendDuelResult) {
             streamHub.sendDuelResult(
-                duelResult.winner,
-                duelResult.winnerColor,
-                duelResult.loser,
-                duelResult.loserColor,
-                duelResult.timestamp
+                duelData.winnerKey,
+                duelData.winnerDisplayName,
+                duelData.winnerColor,
+                duelData.loserKey,
+                duelData.loserDisplayName,
+                duelData.loserColor,
+                duelData.timestamp
             );
         }
     },

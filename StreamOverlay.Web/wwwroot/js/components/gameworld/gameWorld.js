@@ -3,7 +3,6 @@ import { formatMessageWithEmotes } from '../../utils/messageUtils.js';
 import TurtleRenderer from './turtleRenderer.js';
 
 // СИСТЕМЫ
-
 class PhysicsSystem {
     static applyGravityAndMovement(physics, platforms, worldWidth, worldHeight, config) {
         physics.vy += config.GRAVITY;
@@ -203,8 +202,8 @@ export class GameWorld {
         this.walkSpeedPxPerFrame = 0;
         this._lastTimestamp = 0;
 
-        this.connectionService = connectionService; 
-        this.leaderboardElement = null;              
+        this.connectionService = connectionService;
+        this.leaderboardElement = null;
 
         this._animationLoop = this._animationLoop.bind(this);
         this._handleResize = this._handleResize.bind(this);
@@ -292,7 +291,7 @@ export class GameWorld {
         html += `</div>`;
 
         if (data.topStreaks && data.topStreaks.length) {
-    
+
             const validStreaks = data.topStreaks.filter(group => group.wins > 0);
             if (validStreaks.length) {
                 let tickerText = '🔥 ТОП ВИНСТРИКИ ЗА ВСЁ ВРЕМЯ 🔥 • ';
@@ -315,7 +314,7 @@ export class GameWorld {
              </div>`;
             }
         } else {
-       
+
             if (data.topStreak && data.topStreak.wins > 0) {
                 const streakName = this._getDisplayName(data.topStreak.name);
                 const tickerText = `🔥 Топ винстрик: ${streakName} — ${data.topStreak.wins} подряд`;
@@ -379,6 +378,92 @@ export class GameWorld {
         });
     }
 
+    _parseTargetSpecifier(spec, defaultPlatform) {
+        if (!spec) return null;
+        spec = spec.trim().toLowerCase();
+
+        // Формат "platform:nickname"
+        if (spec.includes(':')) {
+            const [platform, nickname] = spec.split(':', 2);
+            if (platform && nickname) {
+                return { platform, nickname };
+            }
+        }
+        // Формат "nickname@platform"
+        else if (spec.includes('@')) {
+            const [nickname, platform] = spec.split('@', 2);
+            if (nickname && platform) {
+                return { platform, nickname };
+            }
+        }
+        // Только ник – используем платформу по умолчанию
+        else {
+            return { platform: defaultPlatform, nickname: spec };
+        }
+        return null;
+    }
+
+
+    // Поиск всех персонажей с заданным ником (без учёта платформы)
+    // excludeKey - исключить ключ (для запроса статистики самого себя)
+    _findCharacterByNickname(nickname, excludeKey = null) {
+        const results = [];
+        for (let [key, entry] of this.characters.entries()) {
+            if (excludeKey && key === excludeKey) continue;
+            if (entry.physics.nickname.toLowerCase() === nickname.toLowerCase()) {
+                results.push({ key, entry });
+            }
+        }
+        return results;
+    }
+
+    _resolveDuelTarget(attackerKey, targetSpec) {
+        const attackerPlatform = attackerKey.split(':')[0];
+        const parsed = this._parseTargetSpecifier(targetSpec, attackerPlatform);
+        if (!parsed) {
+            return { success: false, message: "Некорректный формат цели. Используйте: ник или платформа:ник или ник@платформа" };
+        }
+
+        const { platform, nickname } = parsed;
+        const exactKey = `${platform}:${nickname}`;
+
+        // Попытка найти точное совпадение по ключу
+        if (this.characters.has(exactKey)) {
+            const target = this.characters.get(exactKey);
+            if (target.physics.state === 'dead') {
+                return { success: false, message: `Цель ${nickname} мертва и не может сражаться` };
+            }
+            if (target.physics.isFighting) {
+                return { success: false, message: `Цель ${nickname} уже в бою` };
+            }
+            return { success: true, targetKey: exactKey };
+        }
+
+        // Поиск по нику без учёта платформы
+        const candidates = this._findCharacterByNickname(nickname);
+        if (candidates.length === 0) {
+            return { success: false, message: `Персонаж с ником "${nickname}" не найден` };
+        }
+        if (candidates.length === 1) {
+            const targetKey = candidates[0].key;
+            const target = candidates[0].entry;
+            if (target.physics.state === 'dead') {
+                return { success: false, message: `Цель ${nickname} мертва` };
+            }
+            if (target.physics.isFighting) {
+                return { success: false, message: `Цель ${nickname} уже в бою` };
+            }
+            return { success: true, targetKey };
+        }
+
+        // Неоднозначность – несколько персонажей с одинаковым ником
+        const platformList = candidates.map(c => c.key.split(':')[0]).join(', ');
+        return {
+            success: false,
+            message: `Найдено несколько персонажей с ником "${nickname}" на платформах: ${platformList}. Уточните, указав платформу, например: ${candidates[0].key}`
+        };
+    }
+
     spawnFromMessage(payload) {
         const platform = (payload?.platform || "unknown").toLowerCase();
         const userName = payload?.user || "Anonymous";
@@ -390,14 +475,12 @@ export class GameWorld {
         if (message.trim().toLowerCase().startsWith('!дуэль')) {
             const parts = message.trim().split(/\s+/);
             const hasTarget = parts.length >= 2;
-            const targetNickOriginal = hasTarget ? parts[1].trim() : null;
-            const targetNickLower = hasTarget ? targetNickOriginal.toLowerCase() : null;
+            const targetSpec = hasTarget ? parts[1].trim() : null;
 
             let attacker = this.characters.get(attackerKey);
             let isNew = false;
             if (!attacker) {
-                // Временное сообщение, позже заменится, если цель найдена
-                const initialMessage = hasTarget ? `Внезапная атака на ${targetNickOriginal}` : "Введите никнейм цели";
+                const initialMessage = hasTarget ? `Поиск цели "${targetSpec}"...` : "Укажите никнейм цели";
                 this._createCharacter(attackerKey, color, userName, initialMessage, []);
                 attacker = this.characters.get(attackerKey);
                 isNew = true;
@@ -410,33 +493,31 @@ export class GameWorld {
 
             if (!attacker) return;
 
-            if (!hasTarget) {
-                attacker.renderer.updateBubble("Введите никнейм цели");
+            if (!hasTarget || !targetSpec) {
+                attacker.renderer.updateBubble("Укажите никнейм цели (например: !дуэль alex или !дуэль twitch:alex)");
                 return;
             }
 
-            let targetKey = `${platform}:${targetNickLower}`;
-            let target = this.characters.get(targetKey);
+            const resolution = this._resolveDuelTarget(attackerKey, targetSpec);
+            if (!resolution.success) {
+                attacker.renderer.updateBubble(resolution.message);
+                return;
+            }
+
+            const targetKey = resolution.targetKey;
+            const target = this.characters.get(targetKey);
 
             if (!target) {
-                for (let [key, entry] of this.characters.entries()) {
-                    const nick = key.split(':')[1];
-                    if (nick === targetNickLower && key !== attackerKey) {
-                        targetKey = key;
-                        target = entry;
-                        break;
-                    }
-                }
-            }
-
-            if (!target || attacker === target) {
-                attacker.renderer.updateBubble("Цель не найдена");
+                attacker.renderer.updateBubble("Цель исчезла. Попробуйте ещё раз");
                 return;
             }
 
-            // Отображение реального ника (из physics.nickname)
-            const targetDisplayNick = target.physics.nickname;
+            if (target === attacker) {
+                attacker.renderer.updateBubble("Нельзя вызвать самого себя");
+                return;
+            }
 
+            const targetDisplayNick = target.physics.nickname;
             if (!isNew) {
                 this._updateCharacterBubble(attacker.renderer, `Вызываю на дуэль ${targetDisplayNick}`, []);
             } else {
@@ -447,16 +528,13 @@ export class GameWorld {
                 attacker.renderer.updateBubble("Вы уже в бою");
                 return;
             }
-
             if (attacker.physics.state === 'dead') {
                 return;
             }
-
             if (target.physics.state === 'dead') {
                 attacker.renderer.updateBubble("Цель мертва");
                 return;
             }
-
             if (target.physics.isFighting) {
                 attacker.renderer.updateBubble("Цель уже сражается");
                 return;
@@ -468,20 +546,69 @@ export class GameWorld {
 
         if (message.trim().toLowerCase().startsWith('!статистика')) {
             const parts = message.trim().split(/\s+/);
-            const callerKey = `${platform}:${userName.trim().toLowerCase()}`;
-
-            let targetKey = callerKey;
-
+            const callerKey = attackerKey; 
+            let targetSpec = null;
             if (parts.length >= 2) {
-                const targetNickRaw = parts[1].trim();
-                const targetNickLower = targetNickRaw.toLowerCase();
-                targetKey = `${platform}:${targetNickLower}`;
+                targetSpec = parts[1].trim();
+            }
+
+            let targetKey = callerKey; // по умолчанию – сам
+
+            if (targetSpec) {
+        
+                const defaultPlatform = callerKey.split(':')[0];
+                const parsed = this._parseTargetSpecifier(targetSpec, defaultPlatform);
+                if (parsed) {
+                    const { platform, nickname } = parsed;
+                    const exactKey = `${platform}:${nickname}`;
+                    if (this.characters.has(exactKey)) {
+                        targetKey = exactKey;
+                    } else {
+                        // Ищем по нику без платформы
+                        const candidates = this._findCharacterByNickname(nickname);
+                        if (candidates.length === 0) {
+                            
+                            let callerChar = this.characters.get(callerKey);
+                            if (!callerChar) {
+                                this._createCharacter(callerKey, color, userName, "Персонаж создан...", []);
+                                callerChar = this.characters.get(callerKey);
+                            }
+                            if (callerChar) {
+                                callerChar.renderer.updateBubble(`Персонаж с ником "${nickname}" не найден`);
+                            }
+                            return;
+                        } else if (candidates.length === 1) {
+                            targetKey = candidates[0].key;
+                        } else {
+                           
+                            const platformList = candidates.map(c => c.key.split(':')[0]).join(', ');
+                            let callerChar = this.characters.get(callerKey);
+                            if (!callerChar) {
+                                this._createCharacter(callerKey, color, userName, "Запрос статистики...", []);
+                                callerChar = this.characters.get(callerKey);
+                            }
+                            if (callerChar) {
+                                callerChar.renderer.updateBubble(`Найдено несколько игроков с ником "${nickname}" на платформах: ${platformList}. Уточните: платформа:ник`);
+                            }
+                            return;
+                        }
+                    }
+                } else {
+                    // некорректный формат
+                    let callerChar = this.characters.get(callerKey);
+                    if (!callerChar) {
+                        this._createCharacter(callerKey, color, userName, "Запрос статистики...", []);
+                        callerChar = this.characters.get(callerKey);
+                    }
+                    if (callerChar) {
+                        callerChar.renderer.updateBubble("Некорректный формат. Используйте: ник или платформа:ник");
+                    }
+                    return;
+                }
             }
 
             let callerChar = this.characters.get(callerKey);
             if (!callerChar) {
-            
-                const color = resolveMessageColor(payload);
                 this._createCharacter(callerKey, color, userName, "Запрос статистики...", []);
                 callerChar = this.characters.get(callerKey);
             } else {
@@ -525,7 +652,7 @@ export class GameWorld {
             };
 
             this.connectionService.requestPlayerStats(callerKey, targetKey);
-            return; 
+            return;
         }
 
         if (this.characters.has(attackerKey)) {
@@ -588,7 +715,9 @@ export class GameWorld {
             fightAttackTimer: 0,
             fightCanAttack: false,
             deadTimer: 0,
-            nickname: nickname // FIX: сохраняем оригинальный ник
+            key: key,
+            platform: key.split(':')[0],
+            nickname: nickname,
         };
 
         const characterType = this.config.character;
@@ -607,6 +736,7 @@ export class GameWorld {
         });
 
         this.characters.set(key, { physics, renderer });
+
         renderer.init();
         this._updateContainerPosition(renderer, physics);
 
@@ -694,19 +824,15 @@ export class GameWorld {
             }
         }
 
-        // FIX: передаём в колбэк оригинальные ники из physics.nickname
         if (this.onDuelEndCallback && winner && loser) {
-            const winnerNick = winner.physics.nickname;
-            const loserNick = loser.physics.nickname;
-            const winnerColor = winner.renderer.options.color;
-            const loserColor = loser.renderer.options.color;
-            const timestamp = Date.now();                        
             this.onDuelEndCallback({
-                winner: winnerNick,
-                winnerColor: winnerColor,
-                loser: loserNick,
-                loserColor: loserColor,
-                timestamp: timestamp
+                winnerKey: winner.physics.key,
+                winnerDisplayName: winner.physics.nickname,
+                winnerColor: winner.renderer.options.color,
+                loserKey: loser.physics.key,
+                loserDisplayName: loser.physics.nickname,
+                loserColor: loser.renderer.options.color,
+                timestamp: Date.now()
             });
         }
     }

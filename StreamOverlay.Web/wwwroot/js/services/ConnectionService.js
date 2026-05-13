@@ -70,20 +70,28 @@
         }
     }
 
-    async sendDuelResult(winner, winnerColor, loser, loserColor, timestamp) {
-        if (this.connection.state === signalR.HubConnectionState.Connected) {
-            try {
-                await this.connection.invoke("ReceiveDuelResult", winner, winnerColor, loser, loserColor, timestamp);
-                console.log(`Результат дуэли: ${winner} vs ${loser} отправлен`);
-            } catch (err) {
-                console.error("Ошибка отправки результата дуэли:", err);
-            }
-        } else {
-            console.warn("SignalR не подключен");
-        }
+    async sendDuelResult(
+        winnerKey,
+        winnerDisplayName,
+        winnerColor,
+        loserKey,
+        loserDisplayName,
+        loserColor,
+        timestamp
+    ) {
+        await this.connection.invoke(
+            "ReceiveDuelResult",
+            winnerKey,
+            winnerDisplayName,
+            winnerColor,
+            loserKey,
+            loserDisplayName,
+            loserColor,
+            timestamp);
     }
 
     async requestPlayerStats(callerKey, playerKey) {
+        console.log(`Запрос статы для: ${callerKey} vs ${playerKey} отправлен`)
         if (this.connection.state === signalR.HubConnectionState.Connected) {
             try {
                 await this.connection.invoke("RequestPlayerStats", callerKey, playerKey);

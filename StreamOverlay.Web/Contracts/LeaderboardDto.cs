@@ -31,7 +31,8 @@ public class LeaderboardDto
 
 public class PlayerStatsDto
 {
-    public string Name { get; set; } 
+    public string Name { get; set; }
+    public string Platform { get; set; }
     public int Wins { get; set; }
     public int Losses { get; set; }
     public int TotalDuels => Wins + Losses;

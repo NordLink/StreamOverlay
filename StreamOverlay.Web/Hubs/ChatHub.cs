@@ -43,10 +43,25 @@ public class ChatHub : Hub
     }
 
 
-    public async Task ReceiveDuelResult(string winner, string winnerColor, string loser, string loserColor, long timestamp)
+    public async Task ReceiveDuelResult(
+        string winner,
+        string winnerDisplayName,
+        string winnerColor,
+        string loser,
+        string loserDisplayName,
+        string loserColor,
+        long timestamp)
     {
         var duelTime = DateTimeOffset.FromUnixTimeMilliseconds(timestamp).UtcDateTime;
-        await _duelResultService.ProcessDuelResultAsync(winner, loser, winnerColor, loserColor, duelTime);
+        await _duelResultService.ProcessDuelResultAsync(
+            winner,
+            winnerDisplayName,
+            loser,
+            loserDisplayName,
+            winnerColor,
+            loserColor,
+            duelTime
+        );
     }
 
     public async Task RequestPlayerStats(string callerKey, string playerKey)
