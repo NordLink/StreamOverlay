@@ -13,6 +13,7 @@
         this.onChatMessageCallback = null;
         this.onStatusChangeCallback = null;
         this.onLeaderboardUpdateCallback = null;
+        this.onPlayerStatsCallback = null;
         this._setupListeners();
     }
 
@@ -31,6 +32,10 @@
             if (this.onLeaderboardUpdateCallback) {
                 this.onLeaderboardUpdateCallback(data);
             }
+        });
+
+        this.connection.on("playerStats", (callerKey, playerKey, stats) => {
+            if (this.onPlayerStatsCallback) this.onPlayerStatsCallback(callerKey, playerKey, stats);
         });
 
         this.connection.onreconnecting(() => this._setStatus("RECONNECTING"));
@@ -75,6 +80,18 @@
             }
         } else {
             console.warn("SignalR не подключен");
+        }
+    }
+
+    async requestPlayerStats(callerKey, playerKey) {
+        if (this.connection.state === signalR.HubConnectionState.Connected) {
+            try {
+                await this.connection.invoke("RequestPlayerStats", callerKey, playerKey);
+            } catch (err) {
+                console.error("Ошибка вызова RequestPlayerStats:", err);
+            }
+        } else {
+            console.warn("SignalR не подключен, невозможно запросить статистику");
         }
     }
 }

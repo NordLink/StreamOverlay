@@ -273,8 +273,7 @@ export class GameWorld {
         if (data.topWins && data.topWins.length) {
             data.topWins.forEach((entry, index) => {
                 const displayName = this._getDisplayName(entry.name);
-                const winrateFormatted = Math.round(entry.winRate); // уже готовый процент
-                const winrateClass = winrateFormatted >= 50 ? 'positive' : 'negative';
+                const winrateClass = entry.winRate >= 50 ? 'positive' : 'negative';
                 const nameStyle = entry.color ? `style="color: ${entry.color}"` : '';
 
                 html += `<div class="table-row">
@@ -283,7 +282,7 @@ export class GameWorld {
         <span class="col-wins">${entry.wins}</span>
         <span class="col-losses">${entry.losses}</span>
         <span class="col-total">${entry.totalDuels}</span>
-        <span class="col-diff ${winrateClass}">${winrateFormatted}</span>
+        <span class="col-diff ${winrateClass}">${entry.winRate}</span>
     </div>`;
             });
         } else {
@@ -465,6 +464,68 @@ export class GameWorld {
 
             this._startFight(attackerKey, targetKey);
             return;
+        }
+
+        if (message.trim().toLowerCase().startsWith('!статистика')) {
+            const parts = message.trim().split(/\s+/);
+            const callerKey = `${platform}:${userName.trim().toLowerCase()}`;
+
+            let targetKey = callerKey;
+
+            if (parts.length >= 2) {
+                const targetNickRaw = parts[1].trim();
+                const targetNickLower = targetNickRaw.toLowerCase();
+                targetKey = `${platform}:${targetNickLower}`;
+            }
+
+            let callerChar = this.characters.get(callerKey);
+            if (!callerChar) {
+            
+                const color = resolveMessageColor(payload);
+                this._createCharacter(callerKey, color, userName, "Запрос статистики...", []);
+                callerChar = this.characters.get(callerKey);
+            } else {
+                callerChar.renderer.updateBubble("Запрос статистики...");
+            }
+
+            const statsRequestCaller = callerKey;
+            this.connectionService.onPlayerStatsCallback = (respCallerKey, playerKey, stats) => {
+                if (respCallerKey !== statsRequestCaller) return;
+                const targetChar = this.characters.get(respCallerKey);
+                if (!targetChar) return;
+
+                let messageText = "";
+                if (stats) {
+                    const safeName = this._escapeHtml(stats.name);
+                    const colorStyle = stats.color ? `style="color: ${stats.color};"` : '';
+                    const coloredName = `<span ${colorStyle}>${safeName}</span>`;
+                    messageText = `⚔️ ${coloredName} провёл дуэлей: ${stats.totalDuels}<br>` +
+                        `📊 Побед: ${stats.wins} | Поражений: ${stats.losses} | Винрейт: ${stats.winRate}% <br>` +
+                        `📈 Текущий винстрик: ${stats.currentStreak} | Лучший: ${stats.bestStreak}`;
+                } else {
+                    const displayName = playerKey.includes(':') ? playerKey.split(':')[1] : playerKey;
+                    let colorForName = '';
+                    const existingChar = this.characters.get(playerKey);
+                    if (existingChar && existingChar.renderer.options.color) {
+                        colorForName = existingChar.renderer.options.color;
+                    }
+                    const coloredName = colorForName
+                        ? `<span style="color: ${colorForName};">${this._escapeHtml(displayName)}</span>`
+                        : this._escapeHtml(displayName);
+
+                    const isSelf = (playerKey === statsRequestCaller);
+                    if (isSelf) {
+                        messageText = `⚔️ ${coloredName} ещё не стал(а) гладиатором 😔`;
+                    } else {
+                        messageText = `⚔️ Нет данных для игрока "${coloredName}"`;
+                    }
+                }
+                targetChar.renderer.updateBubble(messageText);
+                this.connectionService.onPlayerStatsCallback = null;
+            };
+
+            this.connectionService.requestPlayerStats(callerKey, targetKey);
+            return; 
         }
 
         if (this.characters.has(attackerKey)) {

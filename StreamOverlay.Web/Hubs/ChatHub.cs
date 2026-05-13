@@ -48,4 +48,10 @@ public class ChatHub : Hub
         var duelTime = DateTimeOffset.FromUnixTimeMilliseconds(timestamp).UtcDateTime;
         await _duelResultService.ProcessDuelResultAsync(winner, loser, winnerColor, loserColor, duelTime);
     }
+
+    public async Task RequestPlayerStats(string callerKey, string playerKey)
+    {
+        var stats = _duelResultService.GetPlayerStats(playerKey);
+        await Clients.Caller.SendAsync("playerStats", callerKey, playerKey, stats);
+    }
 }

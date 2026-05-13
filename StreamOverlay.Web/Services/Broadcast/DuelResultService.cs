@@ -1,6 +1,7 @@
 ﻿using System.Text.Json;
 using System.Text.Json.Serialization;
 using Microsoft.AspNetCore.SignalR;
+using System.Linq;
 
 namespace StreamOverlay.Web.Services.Broadcast
 {
@@ -8,6 +9,7 @@ namespace StreamOverlay.Web.Services.Broadcast
     {
         Task ProcessDuelResultAsync(string winnerKey, string loserKey, string winnerColor, string loserColor, DateTime duelTime);
         LeaderboardDto GetLeaderboard();
+        PlayerStatsDto? GetPlayerStats(string playerKey);
     }
 
     public class PlayerStats
@@ -111,6 +113,38 @@ namespace StreamOverlay.Web.Services.Broadcast
             loserStats.LastDuelDate = duelTime;
         }
 
+        public PlayerStatsDto? GetPlayerStats(string playerKey)
+        {
+            lock (_lock)
+            {
+                _stats = LoadFromFile();
+
+                var pureName = playerKey.Contains(':')
+                    ? playerKey.Split(':')[1].ToLowerInvariant()
+                    : playerKey.ToLowerInvariant();
+
+                var entry = _stats.PlayersStat.FirstOrDefault(kvp =>
+                    kvp.Key.Equals(pureName, StringComparison.InvariantCultureIgnoreCase));
+
+                if (entry.Key != null)
+                {
+                    var stats = entry.Value;
+                    var displayName = entry.Key;
+                    return new PlayerStatsDto
+                    {
+                        Name = displayName,
+                        Wins = stats.Wins,
+                        Losses = stats.Losses,
+                        CurrentStreak = stats.CurrentStreak,
+                        BestStreak = stats.BestStreak,
+                        Color = stats.Color
+                    };
+                }
+
+                return null;
+            }
+        }
+
         public LeaderboardDto GetLeaderboard()
         {
             lock (_lock)
@@ -127,7 +161,6 @@ namespace StreamOverlay.Web.Services.Broadcast
                         Losses = kv.Value.Losses,
                         Color = kv.Value.Color,
                         LastDuelDate = kv.Value.LastDuelDate
-                        // TotalDuels и WinRate вычисляются автоматически из геттеров
                     })
                     .ToList();
 
@@ -177,5 +210,6 @@ namespace StreamOverlay.Web.Services.Broadcast
             _logger.LogInformation("Дуэль: победитель {Winner} (винстрик {Streak}) проигравший {Loser}",
                 winnerKey, winnerStats.CurrentStreak, loserKey);
         }
+
     }
 }
