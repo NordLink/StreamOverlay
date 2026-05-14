@@ -3,6 +3,7 @@ import { formatMessageWithEmotes } from '../../utils/messageUtils.js';
 import TurtleRenderer from './turtleRenderer.js';
 
 // СИСТЕМЫ
+
 class PhysicsSystem {
     static applyGravityAndMovement(physics, platforms, worldWidth, worldHeight, config) {
         physics.vy += config.GRAVITY;
@@ -11,6 +12,7 @@ class PhysicsSystem {
         physics.colliderX += physics.vx;
         physics.colliderY += physics.vy;
 
+        // границы мира
         if (physics.colliderX < 0) {
             physics.colliderX = 0;
             if (!physics.isFighting && physics.state !== 'dead') physics.vx *= -1;
@@ -23,6 +25,7 @@ class PhysicsSystem {
 
         physics.isGrounded = false;
 
+        // коллизии с платформами (только при движении вниз)
         if (physics.vy > 0) {
             for (let p of platforms) {
                 if (prevY + physics.colliderHeight <= p.top &&
@@ -42,6 +45,7 @@ class PhysicsSystem {
             }
         }
 
+        // пол (нижняя граница мира)
         if (physics.colliderY + physics.colliderHeight >= worldHeight) {
             physics.colliderY = worldHeight - physics.colliderHeight;
             physics.vy = 0;
@@ -114,6 +118,10 @@ class CombatSystem {
                     physics.colliderX = Math.max(0, Math.min(worldWidth - physics.colliderWidth, physics.colliderX));
                     target.physics.colliderX = Math.max(0, Math.min(worldWidth - target.physics.colliderWidth, target.physics.colliderX));
                 }
+
+                if (!physics.fightCanAttack && !target.physics.fightCanAttack) {
+                    physics.fightCanAttack = true;
+                }
             } else {
                 physics.vx = (dx > 0 ? walkSpeedPxPerFrame : -walkSpeedPxPerFrame);
             }
@@ -126,9 +134,13 @@ class CombatSystem {
             if (physics.fightAttackTimer >= 1000) {
                 renderer.playAttackEffect();
 
-                setTimeout(() => {
+                if (physics.fightTimeout) clearTimeout(physics.fightTimeout);
+                physics.fightTimeout = setTimeout(() => {
+
                     const currentTarget = characters.get(physics.fightTargetKey);
-                    if (!currentTarget || currentTarget.physics.state === 'dead') return;
+                    if (!currentTarget || currentTarget.physics.state === 'dead' || !currentTarget.physics.isFighting) {
+                        return;
+                    }
 
                     const damagePercent = Math.random() * 0.30 + 0.01;
                     const damageMs = config.MAX_LIFETIME * damagePercent;
@@ -145,6 +157,7 @@ class CombatSystem {
                     currentTarget.physics.fightCanAttack = true;
                     currentTarget.physics.fightAttackTimer = 0;
 
+                    if (physics.fightTimeout) physics.fightTimeout = null;
                 }, 300);
 
                 physics.fightAttackTimer = 0;
@@ -154,7 +167,6 @@ class CombatSystem {
         }
 
         physics.actionTimer = 0;
-        physics.isGrounded = true;
     }
 }
 
@@ -179,7 +191,7 @@ export class GameWorld {
             COLLIDER_WIDTH_PERCENT: 50,
             DEBUG_COLLIDER: false,
             WORLD_HEIGHT: 400,
-            MAX_LIFETIME: 900000, // 15 минут
+            MAX_LIFETIME: 900000,
             MAX_CHARACTERS: 20,
             MAX_MESSAGE_LENGTH: 160,
             TARGET_FPS: 60,
@@ -201,6 +213,7 @@ export class GameWorld {
 
         this.walkSpeedPxPerFrame = 0;
         this._lastTimestamp = 0;
+        this._animationId = null;
 
         this.connectionService = connectionService;
         this.leaderboardElement = null;
@@ -221,7 +234,29 @@ export class GameWorld {
         this._createLeaderboardElement();
         this._setupLeaderboardUpdates();
 
-        requestAnimationFrame(this._animationLoop);
+        this._animationId = requestAnimationFrame(this._animationLoop);
+    }
+
+    destroy() {
+        if (this._animationId) {
+            cancelAnimationFrame(this._animationId);
+            this._animationId = null;
+        }
+        window.removeEventListener('resize', this._handleResize);
+
+        for (let entry of this.characters.values()) {
+            if (entry.physics.fightTimeout) {
+                clearTimeout(entry.physics.fightTimeout);
+                entry.physics.fightTimeout = null;
+            }
+            entry.renderer.destroy(true);
+        }
+        this.characters.clear();
+
+        if (this.leaderboardElement) {
+            this.leaderboardElement.remove();
+            this.leaderboardElement = null;
+        }
     }
 
     _createLeaderboardElement() {
@@ -291,7 +326,6 @@ export class GameWorld {
         html += `</div>`;
 
         if (data.topStreaks && data.topStreaks.length) {
-
             const validStreaks = data.topStreaks.filter(group => group.wins > 0);
             if (validStreaks.length) {
                 let tickerText = '🔥 ТОП ВИНСТРИКИ ЗА ВСЁ ВРЕМЯ 🔥 • ';
@@ -314,7 +348,6 @@ export class GameWorld {
              </div>`;
             }
         } else {
-
             if (data.topStreak && data.topStreak.wins > 0) {
                 const streakName = this._getDisplayName(data.topStreak.name);
                 const tickerText = `🔥 Топ винстрик: ${streakName} — ${data.topStreak.wins} подряд`;
@@ -382,30 +415,22 @@ export class GameWorld {
         if (!spec) return null;
         spec = spec.trim().toLowerCase();
 
-        // Формат "platform:nickname"
         if (spec.includes(':')) {
             const [platform, nickname] = spec.split(':', 2);
             if (platform && nickname) {
                 return { platform, nickname };
             }
-        }
-        // Формат "nickname@platform"
-        else if (spec.includes('@')) {
+        } else if (spec.includes('@')) {
             const [nickname, platform] = spec.split('@', 2);
             if (nickname && platform) {
                 return { platform, nickname };
             }
-        }
-        // Только ник – используем платформу по умолчанию
-        else {
+        } else {
             return { platform: defaultPlatform, nickname: spec };
         }
         return null;
     }
 
-
-    // Поиск всех персонажей с заданным ником (без учёта платформы)
-    // excludeKey - исключить ключ (для запроса статистики самого себя)
     _findCharacterByNickname(nickname, excludeKey = null) {
         const results = [];
         for (let [key, entry] of this.characters.entries()) {
@@ -427,7 +452,6 @@ export class GameWorld {
         const { platform, nickname } = parsed;
         const exactKey = `${platform}:${nickname}`;
 
-        // Попытка найти точное совпадение по ключу
         if (this.characters.has(exactKey)) {
             const target = this.characters.get(exactKey);
             if (target.physics.state === 'dead') {
@@ -439,7 +463,6 @@ export class GameWorld {
             return { success: true, targetKey: exactKey };
         }
 
-        // Поиск по нику без учёта платформы
         const candidates = this._findCharacterByNickname(nickname);
         if (candidates.length === 0) {
             return { success: false, message: `Персонаж с ником "${nickname}" не найден` };
@@ -456,7 +479,6 @@ export class GameWorld {
             return { success: true, targetKey };
         }
 
-        // Неоднозначность – несколько персонажей с одинаковым ником
         const platformList = candidates.map(c => c.key.split(':')[0]).join(', ');
         return {
             success: false,
@@ -501,6 +523,10 @@ export class GameWorld {
             const resolution = this._resolveDuelTarget(attackerKey, targetSpec);
             if (!resolution.success) {
                 attacker.renderer.updateBubble(resolution.message);
+                if (isNew) {
+                    attacker.renderer.destroy(true);
+                    this.characters.delete(attackerKey);
+                }
                 return;
             }
 
@@ -509,11 +535,19 @@ export class GameWorld {
 
             if (!target) {
                 attacker.renderer.updateBubble("Цель исчезла. Попробуйте ещё раз");
+                if (isNew) {
+                    attacker.renderer.destroy(true);
+                    this.characters.delete(attackerKey);
+                }
                 return;
             }
 
             if (target === attacker) {
                 attacker.renderer.updateBubble("Нельзя вызвать самого себя");
+                if (isNew) {
+                    attacker.renderer.destroy(true);
+                    this.characters.delete(attackerKey);
+                }
                 return;
             }
 
@@ -546,58 +580,21 @@ export class GameWorld {
 
         if (message.trim().toLowerCase().startsWith('!статистика')) {
             const parts = message.trim().split(/\s+/);
-            const callerKey = attackerKey; 
-            let targetSpec = null;
-            if (parts.length >= 2) {
-                targetSpec = parts[1].trim();
-            }
+            const callerKey = `${platform}:${userName.trim().toLowerCase()}`;
+            let targetSpec = parts.length >= 2 ? parts[1].trim() : null;
 
-            let targetKey = callerKey; // по умолчанию – сам
+            let targetKey = callerKey;
 
             if (targetSpec) {
-        
-                const defaultPlatform = callerKey.split(':')[0];
+                const defaultPlatform = platform;
                 const parsed = this._parseTargetSpecifier(targetSpec, defaultPlatform);
                 if (parsed) {
-                    const { platform, nickname } = parsed;
-                    const exactKey = `${platform}:${nickname}`;
-                    if (this.characters.has(exactKey)) {
-                        targetKey = exactKey;
-                    } else {
-                        // Ищем по нику без платформы
-                        const candidates = this._findCharacterByNickname(nickname);
-                        if (candidates.length === 0) {
-                            
-                            let callerChar = this.characters.get(callerKey);
-                            if (!callerChar) {
-                                this._createCharacter(callerKey, color, userName, "Персонаж создан...", []);
-                                callerChar = this.characters.get(callerKey);
-                            }
-                            if (callerChar) {
-                                callerChar.renderer.updateBubble(`Персонаж с ником "${nickname}" не найден`);
-                            }
-                            return;
-                        } else if (candidates.length === 1) {
-                            targetKey = candidates[0].key;
-                        } else {
-                           
-                            const platformList = candidates.map(c => c.key.split(':')[0]).join(', ');
-                            let callerChar = this.characters.get(callerKey);
-                            if (!callerChar) {
-                                this._createCharacter(callerKey, color, userName, "Запрос статистики...", []);
-                                callerChar = this.characters.get(callerKey);
-                            }
-                            if (callerChar) {
-                                callerChar.renderer.updateBubble(`Найдено несколько игроков с ником "${nickname}" на платформах: ${platformList}. Уточните: платформа:ник`);
-                            }
-                            return;
-                        }
-                    }
+                    const { platform: p, nickname: n } = parsed;
+                    targetKey = `${p}:${n.toLowerCase()}`;
                 } else {
-                    // некорректный формат
                     let callerChar = this.characters.get(callerKey);
                     if (!callerChar) {
-                        this._createCharacter(callerKey, color, userName, "Запрос статистики...", []);
+                        this._createCharacter(callerKey, color, userName, "Некорректный формат. Используйте: ник или платформа:ник", []);
                         callerChar = this.characters.get(callerKey);
                     }
                     if (callerChar) {
@@ -615,10 +612,9 @@ export class GameWorld {
                 callerChar.renderer.updateBubble("Запрос статистики...");
             }
 
-            const statsRequestCaller = callerKey;
             this.connectionService.onPlayerStatsCallback = (respCallerKey, playerKey, stats) => {
-                if (respCallerKey !== statsRequestCaller) return;
-                const targetChar = this.characters.get(respCallerKey);
+                if (respCallerKey !== callerKey) return;
+                const targetChar = this.characters.get(callerKey);
                 if (!targetChar) return;
 
                 let messageText = "";
@@ -627,7 +623,7 @@ export class GameWorld {
                     const colorStyle = stats.color ? `style="color: ${stats.color};"` : '';
                     const coloredName = `<span ${colorStyle}>${safeName}</span>`;
                     messageText = `⚔️ ${coloredName} провёл дуэлей: ${stats.totalDuels}<br>` +
-                        `📊 Побед: ${stats.wins} | Поражений: ${stats.losses} | Винрейт: ${stats.winRate}% <br>` +
+                        `📊 Побед: ${stats.wins} | Поражений: ${stats.losses} | Винрейт: ${stats.winRate}%<br>` +
                         `📈 Текущий винстрик: ${stats.currentStreak} | Лучший: ${stats.bestStreak}`;
                 } else {
                     const displayName = playerKey.includes(':') ? playerKey.split(':')[1] : playerKey;
@@ -640,7 +636,7 @@ export class GameWorld {
                         ? `<span style="color: ${colorForName};">${this._escapeHtml(displayName)}</span>`
                         : this._escapeHtml(displayName);
 
-                    const isSelf = (playerKey === statsRequestCaller);
+                    const isSelf = (playerKey === callerKey);
                     if (isSelf) {
                         messageText = `⚔️ ${coloredName} ещё не стал(а) гладиатором 😔`;
                     } else {
@@ -715,6 +711,7 @@ export class GameWorld {
             fightAttackTimer: 0,
             fightCanAttack: false,
             deadTimer: 0,
+            fightTimeout: null,
             key: key,
             platform: key.split(':')[0],
             nickname: nickname,
@@ -791,6 +788,15 @@ export class GameWorld {
         const winner = this.characters.get(winnerKey);
         const loser = this.characters.get(loserKey);
 
+        if (winner && winner.physics.fightTimeout) {
+            clearTimeout(winner.physics.fightTimeout);
+            winner.physics.fightTimeout = null;
+        }
+        if (loser && loser.physics.fightTimeout) {
+            clearTimeout(loser.physics.fightTimeout);
+            loser.physics.fightTimeout = null;
+        }
+
         if (winner && winner.physics.state !== 'dead') {
             const now = Date.now();
             const oldDieTime = winner.physics.dieTime;
@@ -802,7 +808,6 @@ export class GameWorld {
             winner.physics.fightMoveToTarget = false;
             winner.physics.fightAttackTimer = 0;
             winner.physics.fightCanAttack = false;
-            winner.physics.dieTime = Date.now() + this.config.MAX_LIFETIME;
             winner.renderer.setWinner(true);
             winner.renderer.setInCombat(false);
         }
@@ -924,6 +929,7 @@ export class GameWorld {
             if (physics.state === 'dead') {
                 physics.deadTimer -= delta;
                 if (physics.deadTimer <= 0) {
+                    if (physics.fightTimeout) clearTimeout(physics.fightTimeout);
                     renderer.destroy(true);
                     this.characters.delete(key);
                 } else {
@@ -973,6 +979,6 @@ export class GameWorld {
             this._updateColliderBlockStyle(renderer, physics);
         }
 
-        requestAnimationFrame(this._animationLoop);
+        this._animationId = requestAnimationFrame(this._animationLoop);
     }
 }
