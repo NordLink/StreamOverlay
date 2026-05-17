@@ -83,7 +83,7 @@ public class TwitchChatService : BackgroundService
                     Platform: "twitch", 
                     User: userName, 
                     Message: e.ChatMessage.Message, 
-                    Color: userColor, 
+                    Color: e.ChatMessage.HexColor, 
                     SendTime: formattedDate,
                     Emotes: emoteList), 
                   stoppingToken);

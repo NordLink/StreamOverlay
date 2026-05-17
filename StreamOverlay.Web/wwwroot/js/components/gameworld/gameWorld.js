@@ -413,17 +413,17 @@ export class GameWorld {
 
     _parseTargetSpecifier(spec, defaultPlatform) {
         if (!spec) return null;
-        spec = spec.trim().toLowerCase();
+        spec = spec.trim();
 
         if (spec.includes(':')) {
             const [platform, nickname] = spec.split(':', 2);
             if (platform && nickname) {
-                return { platform, nickname };
+                return { platform: platform.toLowerCase(), nickname: nickname.trim() };
             }
         } else if (spec.includes('@')) {
             const [nickname, platform] = spec.split('@', 2);
             if (nickname && platform) {
-                return { platform, nickname };
+                return { platform: platform.toLowerCase(), nickname: nickname.trim() };
             }
         } else {
             return { platform: defaultPlatform, nickname: spec };
@@ -495,9 +495,9 @@ export class GameWorld {
         const attackerKey = `${platform}:${userName.trim().toLowerCase()}`;
 
         if (message.trim().toLowerCase().startsWith('!дуэль')) {
-            const parts = message.trim().split(/\s+/);
-            const hasTarget = parts.length >= 2;
-            const targetSpec = hasTarget ? parts[1].trim() : null;
+            const match = message.trim().match(/^!дуэль\s+(.+)$/i);
+            const hasTarget = !!match;
+            const targetSpec = hasTarget ? match[1].trim() : null;
 
             let attacker = this.characters.get(attackerKey);
             let isNew = false;
@@ -523,10 +523,10 @@ export class GameWorld {
             const resolution = this._resolveDuelTarget(attackerKey, targetSpec);
             if (!resolution.success) {
                 attacker.renderer.updateBubble(resolution.message);
-                if (isNew) {
-                    attacker.renderer.destroy(true);
-                    this.characters.delete(attackerKey);
-                }
+                //if (isNew) {
+                //    attacker.renderer.destroy(true);
+                //    this.characters.delete(attackerKey);
+                //}
                 return;
             }
 
@@ -579,9 +579,9 @@ export class GameWorld {
         }
 
         if (message.trim().toLowerCase().startsWith('!статистика')) {
-            const parts = message.trim().split(/\s+/);
+            const match = message.trim().match(/^!статистика\s+(.+)$/i);
             const callerKey = `${platform}:${userName.trim().toLowerCase()}`;
-            let targetSpec = parts.length >= 2 ? parts[1].trim() : null;
+            let targetSpec = match ? match[1].trim() : null;
 
             let targetKey = callerKey;
 
