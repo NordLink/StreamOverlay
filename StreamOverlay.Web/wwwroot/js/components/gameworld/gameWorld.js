@@ -4,10 +4,15 @@ import TurtleRenderer from './turtleRenderer.js';
 
 // СИСТЕМЫ
 
+
+// PhysicsSystem отвечает за гравитацию, движение и коллизии с платформами/границами. Не зависит от игровой логики (бои, AI) – только физика.
 class PhysicsSystem {
+
+    // Применяет гравитацию, обновляет позицию, обрабатывает столкновения.
+    // physics - состояние физики персонажа
     static applyGravityAndMovement(physics, platforms, worldWidth, worldHeight, config) {
-        physics.vy += config.GRAVITY;
-        const prevY = physics.colliderY;
+        physics.vy += config.GRAVITY; // вертикальная скорость персонажа (скорость падения), измеряется в пикселях за кадр
+        const prevY = physics.colliderY; // предыдущая Y для проверки коллизий
 
         physics.colliderX += physics.vx;
         physics.colliderY += physics.vy;
@@ -15,11 +20,11 @@ class PhysicsSystem {
         // границы мира
         if (physics.colliderX < 0) {
             physics.colliderX = 0;
-            if (!physics.isFighting && physics.state !== 'dead') physics.vx *= -1;
+            if (!physics.isFighting) physics.vx *= -1;
             else physics.vx = 0;
         } else if (physics.colliderX + physics.colliderWidth > worldWidth) {
             physics.colliderX = worldWidth - physics.colliderWidth;
-            if (!physics.isFighting && physics.state !== 'dead') physics.vx *= -1;
+            if (!physics.isFighting) physics.vx *= -1;
             else physics.vx = 0;
         }
 
@@ -28,6 +33,7 @@ class PhysicsSystem {
         // коллизии с платформами (только при движении вниз)
         if (physics.vy > 0) {
             for (let p of platforms) {
+                // Если ноги персонажа касаются платформы сверху
                 if (prevY + physics.colliderHeight <= p.top &&
                     physics.colliderY + physics.colliderHeight >= p.top &&
                     physics.colliderX + physics.colliderWidth > p.left &&
@@ -37,7 +43,8 @@ class PhysicsSystem {
                     physics.vy = 0;
                     physics.isGrounded = true;
 
-                    if (!physics.isFighting && physics.state !== 'dead') {
+                    // Если не в бою – обновляем состояние (ходьба/покой)
+                    if (!physics.isFighting) {
                         physics.state = physics.vx === 0 ? 'idle' : 'walking';
                     }
                     break;
@@ -50,18 +57,21 @@ class PhysicsSystem {
             physics.colliderY = worldHeight - physics.colliderHeight;
             physics.vy = 0;
             physics.isGrounded = true;
-            if (!physics.isFighting && physics.state !== 'dead') {
+            if (!physics.isFighting) {
                 physics.state = physics.vx === 0 ? 'idle' : 'walking';
             }
         }
     }
 }
 
+// Управляет случайным блужданием персонажей, когда они не в бою
 class AISystem {
-    static updateWandering(physics, walkSpeedPxPerFrame, config, delta) {
-        if (physics.state === 'dead') return;
 
+    // Обновляет таймер действия и меняет направление/прыжок случайным образом.
+    // delta - время с прошлого кадра
+    static updateWandering(physics, walkSpeedPxPerFrame, config, delta) {
         physics.actionTimer -= delta;
+        // Только если персонаж на земле и таймер истёк – выбираем новое действие
         if (physics.actionTimer <= 0 && physics.isGrounded) {
             physics.actionTimer = Math.random() * 2000 + 500;
             const rand = Math.random();
@@ -80,13 +90,27 @@ class AISystem {
     }
 }
 
+// Управляет боем двух персонажей: сближение, поочерёдные удары, нанесение урона.
 class CombatSystem {
+
+    // Обрабатывает один кадр боя.
+    // {string} key - ключ текущего персонажа
+    // {Object} entry - запись {physics, renderer}
+    // {Map} characters - все персонажи
+    // {Object} config - конфигурация (MAX_LIFETIME и др.)
+    // {number} walkSpeedPxPerFrame - скорость для сближения
+    // {number} delta - время с прошлого кадра
+    // {number} now - текущее время
+    // {number} worldWidth - ширина мира
+    // {Function} onFightEnd - колбэк при завершении боя
+
     static processFight(key, entry, characters, config, walkSpeedPxPerFrame, delta, now, worldWidth, onFightEnd) {
         const physics = entry.physics;
         const renderer = entry.renderer;
         const target = characters.get(physics.fightTargetKey);
 
-        if (!target || target.physics.state === 'dead') {
+        // Если цели нет или она стала лузером – бой заканчивается
+        if (!target || target.physics.isLoser) {
             onFightEnd(key, physics.fightTargetKey);
             return;
         }
@@ -97,14 +121,16 @@ class CombatSystem {
             const targetCenter = target.physics.colliderX + target.physics.colliderWidth / 2;
             const dx = targetCenter - currCenter;
             const distance = Math.abs(dx);
-            const desiredDistance = physics.fullWidth * 1;
+            const desiredDistance = physics.fullWidth * 0.8; // желаемая дистанция = ширина персонажа
 
             if (distance < desiredDistance) {
+                // Достигли нужной дистанции – останавливаем сближение
                 physics.fightMoveToTarget = false;
                 physics.vx = 0;
                 target.physics.fightMoveToTarget = false;
                 target.physics.vx = 0;
 
+                // Коррекция позиции, чтобы не было наложения
                 const overlap = desiredDistance - distance;
                 if (overlap > 0) {
                     const correction = overlap / 2;
@@ -115,10 +141,12 @@ class CombatSystem {
                         physics.colliderX += correction;
                         target.physics.colliderX -= correction;
                     }
+                    // Ограничение границами мира
                     physics.colliderX = Math.max(0, Math.min(worldWidth - physics.colliderWidth, physics.colliderX));
                     target.physics.colliderX = Math.max(0, Math.min(worldWidth - target.physics.colliderWidth, target.physics.colliderX));
                 }
 
+                // Оба бойца могут начинать атаковать (первый удар получает тот, у кого true в _startFight)
                 if (!physics.fightCanAttack && !target.physics.fightCanAttack) {
                     physics.fightCanAttack = true;
                 }
@@ -131,18 +159,19 @@ class CombatSystem {
         // Ближний бой – поочередные удары
         if (physics.fightCanAttack) {
             physics.fightAttackTimer += delta;
-            if (physics.fightAttackTimer >= 1000) {
-                renderer.playAttackEffect();
+            if (physics.fightAttackTimer >= 1000) { // удар раз в секунду
+                renderer.playAttackEffect(); // анимация удара
 
                 if (physics.fightTimeout) clearTimeout(physics.fightTimeout);
                 physics.fightTimeout = setTimeout(() => {
 
                     const currentTarget = characters.get(physics.fightTargetKey);
-                    if (!currentTarget || currentTarget.physics.state === 'dead' || !currentTarget.physics.isFighting) {
+                    // Проверка: цель всё ещё существует, не лузер и в бою
+                    if (!currentTarget || currentTarget.physics.isLoser || !currentTarget.physics.isFighting) {
                         return;
                     }
 
-                    const damagePercent = Math.random() * 0.30 + 0.01;
+                    const damagePercent = Math.random() * 0.30 + 0.01; // Урон: случайный процент от MAX_LIFETIME
                     const damageMs = config.MAX_LIFETIME * damagePercent;
                     currentTarget.physics.dieTime -= damageMs;
 
@@ -158,7 +187,7 @@ class CombatSystem {
                     currentTarget.physics.fightAttackTimer = 0;
 
                     if (physics.fightTimeout) physics.fightTimeout = null;
-                }, 300);
+                }, 300); // задержка 300 мс для визуального совпадения с анимацией
 
                 physics.fightAttackTimer = 0;
             }
@@ -166,7 +195,7 @@ class CombatSystem {
             physics.fightAttackTimer = 0;
         }
 
-        physics.actionTimer = 0;
+        physics.actionTimer = 0; // блокировка случайного AI во время боя
     }
 }
 
@@ -177,18 +206,18 @@ export class GameWorld {
         this.world = document.getElementById(elementId);
         if (!this.world) throw new Error(`Элемент с id "${elementId}" не был найден`);
 
-        this.characterRenderers = new Map();
+        this.characterRenderers = new Map(); 
         this.registerCharacterRenderer('turtle', TurtleRenderer);
 
-        this.characters = new Map();
-        this.platformsData = [];
+        this.characters = new Map(); // ключ -> { physics, renderer }
+        this.platformsData = []; // данные платформ в процентах
 
         const defaultConfig = {
             GRAVITY: 0.4,
             JUMP_POWER: -8,
             WALK_SPEED_PERCENT_PER_SECOND: 5,
-            CHAR_SIZE: 4,
-            COLLIDER_WIDTH_PERCENT: 50,
+            CHAR_SIZE: 6, // размер персонажа в % от ширины мира
+            COLLIDER_WIDTH_PERCENT: 50, // ширина коллайдера в % от размера персонажа
             DEBUG_COLLIDER: false,
             WORLD_HEIGHT: 400,
             MAX_LIFETIME: 900000,
@@ -263,7 +292,7 @@ export class GameWorld {
         this.leaderboardElement = document.createElement('div');
         this.leaderboardElement.className = 'game-leaderboard';
         this.world.appendChild(this.leaderboardElement);
-        this.leaderboardElement.innerHTML = '<div class="loading">📊 Загрузка...</div>';
+        this.leaderboardElement.innerHTML = '<div class="loading">Загрузка...</div>';
     }
 
     _setupLeaderboardUpdates() {
@@ -373,14 +402,14 @@ export class GameWorld {
             return m;
         });
     }
-
+    // Пересчёт скорости ходьбы при изменении размера окна
     _updateSpeedScale() {
         const worldWidth = this.world.offsetWidth;
         if (worldWidth === 0) return;
         const pixelsPerSecond = (this.config.WALK_SPEED_PERCENT_PER_SECOND / 100) * worldWidth;
         this.walkSpeedPxPerFrame = pixelsPerSecond / this.config.TARGET_FPS;
     }
-
+    // Получение координат платформ в пикселях на основе текущих размеров мира
     _getComputedPlatforms() {
         const worldWidth = this.world.offsetWidth;
         const worldHeight = this.world.offsetHeight;
@@ -410,7 +439,7 @@ export class GameWorld {
             });
         });
     }
-
+    // Парсит строку вида "ник" / "платформа:ник" / "ник@платформа" 
     _parseTargetSpecifier(spec, defaultPlatform) {
         if (!spec) return null;
         spec = spec.trim();
@@ -430,7 +459,7 @@ export class GameWorld {
         }
         return null;
     }
-
+    // Ищет персонажей по никнейму(без учёта платформы)
     _findCharacterByNickname(nickname, excludeKey = null) {
         const results = [];
         for (let [key, entry] of this.characters.entries()) {
@@ -441,7 +470,7 @@ export class GameWorld {
         }
         return results;
     }
-
+    // Проверяет возможность дуэли: цель не лузер, не в бою, существует. Если найдено несколько одинаковых ников – просит уточнить платформу.
     _resolveDuelTarget(attackerKey, targetSpec) {
         const attackerPlatform = attackerKey.split(':')[0];
         const parsed = this._parseTargetSpecifier(targetSpec, attackerPlatform);
@@ -454,8 +483,8 @@ export class GameWorld {
 
         if (this.characters.has(exactKey)) {
             const target = this.characters.get(exactKey);
-            if (target.physics.state === 'dead') {
-                return { success: false, message: `Цель ${nickname} мертва и не может сражаться` };
+            if (target.physics.isLoser) {
+                return { success: false, message: `${nickname} временно выведен из строя и не может сражаться`};
             }
             if (target.physics.isFighting) {
                 return { success: false, message: `Цель ${nickname} уже в бою` };
@@ -470,8 +499,8 @@ export class GameWorld {
         if (candidates.length === 1) {
             const targetKey = candidates[0].key;
             const target = candidates[0].entry;
-            if (target.physics.state === 'dead') {
-                return { success: false, message: `Цель ${nickname} мертва` };
+            if (target.physics.isLoser) {
+                return { success: false, message: `Цель ${nickname} временно не может драться (лузер)` };
             }
             if (target.physics.isFighting) {
                 return { success: false, message: `Цель ${nickname} уже в бою` };
@@ -485,7 +514,7 @@ export class GameWorld {
             message: `Найдено несколько персонажей с ником "${nickname}" на платформах: ${platformList}. Уточните, указав платформу, например: ${candidates[0].key}`
         };
     }
-
+    // Главная точка входа из чата. Обрабатывает команды !дуэль, !статистика, а также обычные сообщения (создание/обновление персонажа).
     spawnFromMessage(payload) {
         const platform = (payload?.platform || "unknown").toLowerCase();
         const userName = payload?.user || "Anonymous";
@@ -494,7 +523,10 @@ export class GameWorld {
         const emotes = payload?.emotes || [];
         const attackerKey = `${platform}:${userName.trim().toLowerCase()}`;
 
-        if (message.trim().toLowerCase().startsWith('!дуэль')) {
+        const trimmedMsg = message.trim();
+        const isCommand = trimmedMsg.startsWith('!') && trimmedMsg.length > 1 && trimmedMsg[1] !== ' ';
+
+        if (trimmedMsg.toLowerCase().startsWith('!дуэль')) {
             const match = message.trim().match(/^!дуэль\s+(.+)$/i);
             const hasTarget = !!match;
             const targetSpec = hasTarget ? match[1].trim() : null;
@@ -507,7 +539,8 @@ export class GameWorld {
                 attacker = this.characters.get(attackerKey);
                 isNew = true;
             } else {
-                if (!attacker.physics.isFighting && attacker.physics.state !== 'dead') {
+                // Если персонаж уже существует и не лузер – восстанавливаем 100% HP
+                if (!attacker.physics.isFighting && !attacker.physics.isLoser) {
                     attacker.physics.dieTime = Date.now() + this.config.MAX_LIFETIME;
                     attacker.renderer.showHeal(100);
                 }
@@ -516,17 +549,19 @@ export class GameWorld {
             if (!attacker) return;
 
             if (!hasTarget || !targetSpec) {
-                attacker.renderer.updateBubble("Укажите никнейм цели (например: !дуэль alex или !дуэль twitch:alex)");
+                attacker.renderer.updateBubble("Укажите никнейм цели! </br> Например: !дуэль Никнейм или !дуэль twitch:никнейм", 'warning');
+                return;
+            }
+
+            // Проигравший не может вызывать на дуэль
+            if (attacker.physics.isLoser) {
+                attacker.renderer.updateBubble("Вы потерпели поражение и временно не можете участвовать в сражениях", 'warning');
                 return;
             }
 
             const resolution = this._resolveDuelTarget(attackerKey, targetSpec);
             if (!resolution.success) {
-                attacker.renderer.updateBubble(resolution.message);
-                //if (isNew) {
-                //    attacker.renderer.destroy(true);
-                //    this.characters.delete(attackerKey);
-                //}
+                attacker.renderer.updateBubble(resolution.message, 'warning');
                 return;
             }
 
@@ -543,7 +578,7 @@ export class GameWorld {
             }
 
             if (target === attacker) {
-                attacker.renderer.updateBubble("Нельзя вызвать самого себя");
+                attacker.renderer.updateBubble("Нельзя вызвать самого себя", 'warning');
                 if (isNew) {
                     attacker.renderer.destroy(true);
                     this.characters.delete(attackerKey);
@@ -553,24 +588,25 @@ export class GameWorld {
 
             const targetDisplayNick = target.physics.nickname;
             if (!isNew) {
-                this._updateCharacterBubble(attacker.renderer, `Вызываю на дуэль ${targetDisplayNick}`, []);
+                this._updateCharacterBubble(attacker.renderer, `Вызываю на дуэль ${targetDisplayNick}`, [], 'info');
             } else {
-                attacker.renderer.updateBubble(`Внезапная атака на ${targetDisplayNick}`);
+                attacker.renderer.updateBubble(`Внезапная атака на ${targetDisplayNick}`, 'info');
             }
-
+            // Проверки перед стартом боя
             if (attacker.physics.isFighting) {
                 attacker.renderer.updateBubble("Вы уже в бою");
                 return;
             }
-            if (attacker.physics.state === 'dead') {
-                return;
-            }
-            if (target.physics.state === 'dead') {
-                attacker.renderer.updateBubble("Цель мертва");
-                return;
-            }
             if (target.physics.isFighting) {
                 attacker.renderer.updateBubble("Цель уже сражается");
+                return;
+            }
+            if (attacker.physics.isLoser) {
+                attacker.renderer.updateBubble("Вы временно не можете драться (лузер)");
+                return;
+            }
+            if (target.physics.isLoser) {
+                attacker.renderer.updateBubble("Цель временно не может драться (лузер)");
                 return;
             }
 
@@ -578,7 +614,7 @@ export class GameWorld {
             return;
         }
 
-        if (message.trim().toLowerCase().startsWith('!статистика')) {
+        if (trimmedMsg.toLowerCase().startsWith('!статистика')) {
             const match = message.trim().match(/^!статистика\s+(.+)$/i);
             const callerKey = `${platform}:${userName.trim().toLowerCase()}`;
             let targetSpec = match ? match[1].trim() : null;
@@ -609,6 +645,10 @@ export class GameWorld {
                 this._createCharacter(callerKey, color, userName, "Запрос статистики...", []);
                 callerChar = this.characters.get(callerKey);
             } else {
+                if (!callerChar.physics.isFighting && !callerChar.physics.isLoser) {
+                    callerChar.physics.dieTime = Date.now() + this.config.MAX_LIFETIME;
+                    callerChar.renderer.showHeal(100);
+                }
                 callerChar.renderer.updateBubble("Запрос статистики...");
             }
 
@@ -638,12 +678,12 @@ export class GameWorld {
 
                     const isSelf = (playerKey === callerKey);
                     if (isSelf) {
-                        messageText = `⚔️ ${coloredName} ещё не стал(а) гладиатором 😔`;
+                        messageText = `⚔️ Игрок ${coloredName} ещё участвовал в боях 😔`;
                     } else {
                         messageText = `⚔️ Нет данных для игрока "${coloredName}"`;
                     }
                 }
-                targetChar.renderer.updateBubble(messageText);
+                targetChar.renderer.updateBubble(messageText, 'info');
                 this.connectionService.onPlayerStatsCallback = null;
             };
 
@@ -651,9 +691,26 @@ export class GameWorld {
             return;
         }
 
+        // Если неизвестная команда (начинается с ! и не пробел)
+        if (isCommand) {
+            const firstWord = trimmedMsg.split(/\s+/)[0].toLowerCase();
+            let entry = this.characters.get(attackerKey);
+            if (!entry) {
+                this._createCharacter(attackerKey, color, userName, `Неизвестная команда: ${firstWord}`, [], 'error');
+            } else {
+                if (!entry.physics.isFighting && !entry.physics.isLoser) {
+                    entry.physics.dieTime = Date.now() + this.config.MAX_LIFETIME;
+                    entry.renderer.showHeal(100);
+                }
+                entry.renderer.updateBubble(`Неизвестная команда: ${firstWord}`, 'error');
+            }
+            return;
+        }
+
         if (this.characters.has(attackerKey)) {
             const entry = this.characters.get(attackerKey);
-            if (!entry.physics.isFighting && entry.physics.state !== 'dead') {
+            // Лечим, только если персонаж не в бою и не лузер
+            if (!entry.physics.isFighting && !entry.physics.isLoser) {
                 entry.physics.dieTime = Date.now() + this.config.MAX_LIFETIME;
                 entry.renderer.showHeal(100);
             }
@@ -662,8 +719,9 @@ export class GameWorld {
             this._createCharacter(attackerKey, color, userName, message, emotes);
         }
     }
-
-    _createCharacter(key, color, nickname, message, emotes) {
+    // Создаёт нового персонажа (рендерер + физическое состояние).
+    // При превышении MAX_CHARACTERS удаляется игрок (не лузер) с наименьшим оставшимся временем жизни.
+    _createCharacter(key, color, nickname, message, emotes, bubbleType = null) {
         const worldWidth = this.world.offsetWidth;
         const worldHeight = this.world.offsetHeight;
         if (worldWidth === 0) return;
@@ -672,7 +730,7 @@ export class GameWorld {
             let oldestKey = null;
             let minDieTime = Infinity;
             for (let [k, entry] of this.characters) {
-                if (entry.physics.state !== 'dead' && entry.physics.dieTime < minDieTime) {
+                if (!entry.physics.isLoser && entry.physics.dieTime < minDieTime) {
                     minDieTime = entry.physics.dieTime;
                     oldestKey = k;
                 }
@@ -710,11 +768,12 @@ export class GameWorld {
             fightMoveToTarget: false,
             fightAttackTimer: 0,
             fightCanAttack: false,
-            deadTimer: 0,
             fightTimeout: null,
             key: key,
             platform: key.split(':')[0],
             nickname: nickname,
+            isLoser: false,
+            loserUntil: 0
         };
 
         const characterType = this.config.character;
@@ -733,15 +792,22 @@ export class GameWorld {
         });
 
         this.characters.set(key, { physics, renderer });
-
         renderer.init();
         this._updateContainerPosition(renderer, physics);
 
         if (message) {
-            this._updateCharacterBubble(renderer, message, emotes);
+            const truncated = message.length > this.config.MAX_MESSAGE_LENGTH
+                ? message.substring(0, this.config.MAX_MESSAGE_LENGTH) + '...'
+                : message;
+            const formatted = formatMessageWithEmotes(truncated, emotes);
+            renderer.updateBubble(formatted, bubbleType);
         }
     }
-
+ 
+     //Начинает дуэль между двумя персонажами.
+     //Обоим выставляется 100% HP, сбрасываются статусы лузера/победителя,
+     //включается флаг isFighting, задаётся направление (кто левее/правее).
+     //Первый удар делает атакующий (attacker).
     _startFight(keyA, keyB) {
         const charA = this.characters.get(keyA);
         const charB = this.characters.get(keyB);
@@ -754,8 +820,8 @@ export class GameWorld {
         charA.renderer.showHeal(100);
         charB.renderer.showHeal(100);
 
-        charA.renderer.setWinner(false);
-        charB.renderer.setWinner(false);
+        charA.renderer.setLoser(false);
+        charB.renderer.setLoser(false);
 
         charA.renderer.setInCombat(true);
         charB.renderer.setInCombat(true);
@@ -780,14 +846,15 @@ export class GameWorld {
             char.physics.fightCanAttack = isFirstStriker;
         };
 
-        setupFighter(charA, keyB, true);
+        setupFighter(charA, keyB, true); // атакующий получает право первого удара
         setupFighter(charB, keyA, false);
     }
-
+    // Завершает дуэль. Победитель: 100% HP, получает класс winner. Проигравший: 50 % HP, получает класс loser на время равное 10 % от MAX_LIFETIME.
     _endFight(winnerKey, loserKey) {
         const winner = this.characters.get(winnerKey);
         const loser = this.characters.get(loserKey);
-
+        const now = Date.now();
+        // Очистка таймаутов, чтобы избежать повторных ударов после боя
         if (winner && winner.physics.fightTimeout) {
             clearTimeout(winner.physics.fightTimeout);
             winner.physics.fightTimeout = null;
@@ -797,36 +864,37 @@ export class GameWorld {
             loser.physics.fightTimeout = null;
         }
 
-        if (winner && winner.physics.state !== 'dead') {
-            const now = Date.now();
-            const oldDieTime = winner.physics.dieTime;
-            winner.physics.dieTime = now + this.config.MAX_LIFETIME;
-            const healAmount = (winner.physics.dieTime - oldDieTime) / this.config.MAX_LIFETIME * 100;
-            if (healAmount > 0) winner.renderer.showHeal(healAmount);
+        // Победитель
+        if (winner) {
+            winner.physics.dieTime = now + this.config.MAX_LIFETIME; // 100% HP
             winner.physics.isFighting = false;
             winner.physics.fightTargetKey = null;
             winner.physics.fightMoveToTarget = false;
             winner.physics.fightAttackTimer = 0;
             winner.physics.fightCanAttack = false;
+            winner.physics.isLoser = false;
+            winner.physics.loserUntil = 0;
+            winner.renderer.setLoser(false);
             winner.renderer.setWinner(true);
             winner.renderer.setInCombat(false);
+            winner.renderer.updateLifeBar(100);
+            winner.renderer.updateBubble("Flawless Victory!", 'info')
         }
 
+        // Проигравший
         if (loser) {
+            loser.physics.dieTime = now + this.config.MAX_LIFETIME * 0.5; // 50% HP
             loser.physics.isFighting = false;
             loser.physics.fightTargetKey = null;
             loser.physics.fightMoveToTarget = false;
             loser.physics.fightAttackTimer = 0;
             loser.physics.fightCanAttack = false;
+            loser.physics.isLoser = true;
+            loser.physics.loserUntil = now + this.config.MAX_LIFETIME * 0.2; // 20% от MAX_LIFETIME
+            loser.renderer.setLoser(true);
             loser.renderer.setWinner(false);
             loser.renderer.setInCombat(false);
-            if (loser.physics.state !== 'dead') {
-                loser.physics.state = 'dead';
-                loser.physics.deadTimer = 10000;
-                loser.physics.vx = 0;
-                loser.renderer.setState('dead');
-                loser.renderer.updateLifeBar(0);
-            }
+            loser.renderer.updateLifeBar(50);
         }
 
         if (this.onDuelEndCallback && winner && loser) {
@@ -841,26 +909,25 @@ export class GameWorld {
             });
         }
     }
-
-    _updateCharacterBubble(renderer, message, emotes) {
+    // Обновление текста пузыря над головой (с форматированием эмодзи)
+    _updateCharacterBubble(renderer, message, emotes, bubbleType=null) {
         if (!message) return;
         const truncated = message.length > this.config.MAX_MESSAGE_LENGTH
             ? message.substring(0, this.config.MAX_MESSAGE_LENGTH) + '...'
             : message;
         const formatted = formatMessageWithEmotes(truncated, emotes);
-        renderer.updateBubble(formatted);
+        renderer.updateBubble(formatted, bubbleType);
     }
-
+    // Позиционирование контейнера персонажа (коллайдер, смещение)
     _updateContainerPosition(renderer, physics) {
         const containerX = physics.colliderX - physics.colliderOffsetX;
         const containerY = physics.colliderY;
         renderer.setPosition(containerX, containerY);
     }
-
     _updateColliderBlockStyle(renderer, physics) {
         renderer.updateColliderDimensions(physics.colliderWidth, physics.colliderHeight, physics.colliderOffsetX);
     }
-
+    // Обработка изменения размера окна – пересчёт размеров персонажей и скорости
     _handleResize() {
         const oldSpeed = this.walkSpeedPxPerFrame;
         this._updateSpeedScale();
@@ -910,7 +977,17 @@ export class GameWorld {
             this._updateColliderBlockStyle(renderer, physics);
         }
     }
-
+    
+   // ГЛАВНЫЙ ИГРОВОЙ ЦИКЛ. Выполняется на каждом кадре. Порядок действий важен:
+   // 1) Снятие лузера по таймеру (без изменения здоровья).
+   // 2) Обработка боя (если есть) – может изменить dieTime, isFighting.
+   // 3) Физика (гравитация, коллизии).
+   // 4) Визуальные обновления (состояние, направление, позиция).
+   // 5) Проверка истечения HP:
+       // - Лузер с HP <=0 → восстанавливает 50% HP (не умирает).
+       // - Персонаж в бою с HP <=0 → вызывается _endFight (становится лузером).
+       // - Обычный персонаж не в бою с HP <=0 → удаляется навсегда.
+   // 6) Обновление полоски жизни.   
     _animationLoop(timestamp) {
         if (!this._lastTimestamp) this._lastTimestamp = timestamp;
         let delta = Math.min(100, timestamp - this._lastTimestamp);
@@ -926,35 +1003,14 @@ export class GameWorld {
             const physics = entry.physics;
             const renderer = entry.renderer;
 
-            if (physics.state === 'dead') {
-                physics.deadTimer -= delta;
-                if (physics.deadTimer <= 0) {
-                    if (physics.fightTimeout) clearTimeout(physics.fightTimeout);
-                    renderer.destroy(true);
-                    this.characters.delete(key);
-                } else {
-                    PhysicsSystem.applyGravityAndMovement(physics, platforms, worldWidth, worldHeight, this.config);
-                    this._updateContainerPosition(renderer, physics);
-                }
-                continue;
+            // Снятие статуса лузера по таймеру (здоровье не меняется)
+            if (physics.isLoser && physics.loserUntil && now > physics.loserUntil) {
+                physics.isLoser = false;
+                physics.loserUntil = 0;
+                renderer.setLoser(false);
             }
 
-            const timeLeft = physics.dieTime - now;
-            if (timeLeft <= 0) {
-                if (physics.isFighting && physics.fightTargetKey) {
-                    this._endFight(physics.fightTargetKey, key);
-                }
-                physics.state = 'dead';
-                physics.deadTimer = 10000;
-                physics.vx = 0;
-                renderer.setState('dead');
-                renderer.updateLifeBar(0);
-                continue;
-            }
-
-            const percent = Math.max(0, (timeLeft / this.config.MAX_LIFETIME) * 100);
-            renderer.updateLifeBar(percent);
-
+            // Обработка боя (если есть)
             let isFightingActive = physics.isFighting && physics.fightTargetKey;
             if (isFightingActive) {
                 CombatSystem.processFight(
@@ -966,8 +1022,10 @@ export class GameWorld {
                 AISystem.updateWandering(physics, this.walkSpeedPxPerFrame, this.config, delta);
             }
 
+            // Физика
             PhysicsSystem.applyGravityAndMovement(physics, platforms, worldWidth, worldHeight, this.config);
 
+            // Визуальное состояние
             let visualState = physics.state;
             if (isFightingActive) {
                 visualState = physics.fightMoveToTarget ? 'walking' : 'fighting';
@@ -977,6 +1035,29 @@ export class GameWorld {
 
             this._updateContainerPosition(renderer, physics);
             this._updateColliderBlockStyle(renderer, physics);
+
+            // Проверка истечения HP
+            let timeLeft = physics.dieTime - now;
+
+            // Обработка истечения HP
+            if (timeLeft <= 0) {
+                // Если персонаж в бою – завершаем бой (он станет лузером и получит 50% HP)
+                if (physics.isFighting && physics.fightTargetKey) {
+                    this._endFight(physics.fightTargetKey, key);
+                    // После _endFight у персонажа isLoser = true, dieTime = 50% HP
+                    continue; // переходим к следующему персонажу
+                } else {
+                    // Удаляем персонажа (включая лузеров с истекшим HP)
+                    if (physics.fightTimeout) clearTimeout(physics.fightTimeout);
+                    renderer.destroy(true);
+                    this.characters.delete(key);
+                    continue;
+                }
+            }
+
+            // Обновляем полоску жизни (только если персонаж не удалён)
+            const percent = Math.max(0, ((physics.dieTime - now) / this.config.MAX_LIFETIME) * 100);
+            renderer.updateLifeBar(percent);
         }
 
         this._animationId = requestAnimationFrame(this._animationLoop);

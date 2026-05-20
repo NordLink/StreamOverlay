@@ -1,4 +1,10 @@
-﻿#world {
+﻿@import url('https://fonts.googleapis.com/css2?family=Lexie+Readable&display=swap');
+
+/* ═══════════════════════════════════════════════════════════════════ */
+/* МИР И ПЛАТФОРМЫ */
+/* ═══════════════════════════════════════════════════════════════════ */
+
+#world {
     position: absolute;
     bottom: 4.2%;
     left: 0;
@@ -8,14 +14,20 @@
     max-height: 70vh;
     background-color: rgba(0, 0, 0, 0);
     box-sizing: unset;
+    contain: layout style;
+    transform: translateZ(0);
+    backface-visibility: hidden;
 }
 
 .platform {
     position: absolute;
     /* Платформы визуально скрыты, но физически присутствуют */
+    contain: layout;
 }
 
-/* === БАЗОВЫЕ СТИЛИ ПЕРСОНАЖЕЙ === */
+/* ═══════════════════════════════════════════════════════════════════ */
+/* БАЗОВЫЕ СТИЛИ ПЕРСОНАЖЕЙ */
+/* ═══════════════════════════════════════════════════════════════════ */
 
 .character-container {
     position: absolute;
@@ -24,10 +36,14 @@
     align-items: flex-end;
     will-change: transform;
     transition: none !important;
+    contain: layout style;
+    transform: translateZ(0);
 }
 
 .character-collider {
     background: #ff0;
+    opacity: 0;
+    pointer-events: none;
 }
 
 .svg-char {
@@ -36,7 +52,9 @@
     overflow: visible !important;
 }
 
-/* === ЭЛЕМЕНТЫ ПЕРСОНАЖЕЙ === */
+/* ═══════════════════════════════════════════════════════════════════ */
+/* UI-ЭЛЕМЕНТЫ ПЕРСОНАЖЕЙ */
+/* ═══════════════════════════════════════════════════════════════════ */
 
 .nickname,
 .life-bar-container,
@@ -45,10 +63,15 @@
     left: 50%;
     transform: translateX(-50%);
     pointer-events: none;
+    will-change: transform, opacity;
 }
 
+/* ─────────────────────────────────────────────────────────────────── */
+/* Никнейм */
+/* ─────────────────────────────────────────────────────────────────── */
+
 .nickname {
-    bottom: 100%;
+    bottom: 75%;
     margin-bottom: 0.8cqw;
     font-size: 1cqw;
     font-weight: 800;
@@ -57,8 +80,16 @@
     z-index: 10;
 }
 
-.life-bar-container {
+.character-container.winner .nickname {
     bottom: 100%;
+}
+
+/* ─────────────────────────────────────────────────────────────────── */
+/* Полоса здоровья */
+/* ─────────────────────────────────────────────────────────────────── */
+
+.life-bar-container {
+    bottom: 75%;
     margin-bottom: 0.3cqw;
     width: 4cqw;
     height: 0.4cqw;
@@ -66,6 +97,11 @@
     border: 1px solid #000;
     border-radius: 3px;
     overflow: hidden;
+    contain: paint;
+}
+
+.character-container.winner .life-bar-container {
+    bottom: 100%;
 }
 
 .life-bar-fill {
@@ -73,23 +109,32 @@
     height: 100%;
     background: #2ecc71;
     transition: width 0.1s linear, background-color 0.5s;
+    transform-origin: left;
 }
 
+/* ─────────────────────────────────────────────────────────────────── */
+/* Облако сообщений */
+/* ─────────────────────────────────────────────────────────────────── */
+
 .bubble {
-    bottom: 100%;
+    bottom: 80%;
     margin-bottom: 1.8cqw;
     min-width: 40px;
     max-width: 30.6cqw;
     width: max-content;
     padding: 0.3cqw 0.6cqw;
-    background: white;
-    color: #333;
+    font-family: 'Lexie Readable', 'Comic Neue', 'Comic Sans MS', cursive;
     font-size: 0.8cqw;
-    font-weight: bold;
-    white-space: normal;
-    word-wrap: break-word;
-    border-radius: 12px;
-    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+    font-weight: 800;
+    text-transform: uppercase;
+    letter-spacing: 0.02em;
+    background: #fff9e8;
+    background: linear-gradient(145deg, #ffffff 0%, #fff3df 100%);
+    color: #222222;
+    border: 2px solid #111111;
+    border-radius: 28px 20px 30px 20px;
+    box-shadow: 5px 5px 0px rgba(0, 0, 0, 0.2), 0 4px 12px rgba(0, 0, 0, 0.1);
+    text-align: left;
     transition: opacity 0.5s ease;
     z-index: 20;
 }
@@ -97,15 +142,78 @@
     .bubble::after {
         content: '';
         position: absolute;
-        bottom: -0.3cqw;
+        bottom: -0.8cqw;
         left: 50%;
-        transform: translateX(-50%);
-        border-left: 0.4cqw solid transparent;
-        border-right: 0.4cqw solid transparent;
-        border-top: 0.4cqw solid white;
+        transform: translateX(-50%) rotate(0deg);
+        width: 0;
+        height: 0;
+        border-left: 0.6cqw solid transparent;
+        border-right: 0.6cqw solid transparent;
+        border-top: 0.8cqw solid #111111;
+        filter: drop-shadow(0 2px 0 rgba(0,0,0,0.1));
     }
 
-/* === АНИМАЦИИ === */
+    .bubble::before {
+        content: '';
+        position: absolute;
+        bottom: -0.4cqw;
+        left: 50%;
+        transform: translateX(-50%);
+        width: 0;
+        height: 0;
+        border-left: 0.5cqw solid transparent;
+        border-right: 0.5cqw solid transparent;
+        border-top: 0.6cqw solid #fff9e8;
+        z-index: 1;
+    }
+
+.character-container.winner .bubble {
+    bottom: 100%;
+}
+
+/* ─────────────────────────────────────────────────────────────────── */
+/* Типы сообщений */
+/* ─────────────────────────────────────────────────────────────────── */
+
+.bubble-info {
+    background: linear-gradient(145deg, #e2f0ff, #c8e2ff);
+    border-color: #1f6392;
+}
+
+    .bubble-info::after {
+        border-top: 0.8cqw solid #1f6392;
+    }
+    .bubble-info::before {
+        border-top: 0.6cqw solid #e2f0ff;
+    }
+
+.bubble-warning {
+    background: linear-gradient(145deg, #fff0db, #ffe0b5);
+    border-color: #b45f1b;
+}
+
+    .bubble-warning::after {
+        border-top-color: #b45f1b;
+    }
+    .bubble-warning::before {
+        border-top: 0.6cqw solid #fff0db;
+    }
+
+.bubble-error {
+    background: linear-gradient(145deg, #ffe6e5, #ffcecc);
+    border-color: #a1301f;
+}
+
+    .bubble-error::after {
+        border-top-color: #a1301f;
+    }
+    .bubble-error::before {
+        border-top: 0.6cqw solid #ffe6e5;
+    }
+
+/* ═══════════════════════════════════════════════════════════════════ */
+/* Анимации */
+/* ═══════════════════════════════════════════════════════════════════ */
 
 @keyframes float-breathing {
     0%, 100% {
@@ -143,15 +251,15 @@
     }
 
     30% {
-        transform: rotate(-150deg); /* Замах */
+        transform: rotate(-150deg);
     }
 
     45% {
-        transform: rotate(0deg); /* Удар */
+        transform: rotate(0deg);
     }
 
     100% {
-        transform: rotate(0deg); /* Возврат */
+        transform: rotate(0deg);
     }
 }
 
@@ -177,35 +285,52 @@
     }
 }
 
-/* === СОСТОЯНИЯ ПЕРСОНАЖА === */
+@keyframes pulse {
+    0%, 100% {
+        opacity: 1;
+    }
 
-/* Покой и бой (общая анимация дыхания) */
+    50% {
+        opacity: 0.5;
+    }
+}
+
+@keyframes ticker-scroll {
+    0% {
+        transform: translateX(0);
+    }
+
+    100% {
+        transform: translateX(-100%);
+    }
+}
+
+/* ═══════════════════════════════════════════════════════════════════ */
+/* СОСТОЯНИЯ ПЕРСОНАЖЕЙ */
+/* ═══════════════════════════════════════════════════════════════════ */
+
 .idle #Shell,
 .idle #Head,
 .idle #Belly,
 .idle #HandLeft,
 .idle #HandRight,
-.idle #Mask,
 .idle #Eyelids,
 .fighting #Shell,
 .fighting #Head,
 .fighting #Belly,
 .fighting #HandLeft,
 .fighting #HandRight,
-.fighting #Mask,
 .fighting #Eyelids {
     animation: float-breathing 1.2s ease-in-out infinite;
     will-change: transform;
 }
 
-/* Моргание */
 #Eyelids {
     opacity: 0;
     animation: blink-animation 4s infinite;
     will-change: opacity;
 }
 
-/* Ходьба */
 .walking #LegLeft,
 .walking #LegRight,
 .walking #HandLeft {
@@ -227,19 +352,18 @@
     animation-delay: -0.175s;
 }
 
-/* Прыжок */
 .jumping .svg-char {
 }
 
-/* Смерть */
 .dead {
     opacity: 0.5;
     filter: grayscale(100%);
 }
 
-/* === БОЕВАЯ СИСТЕМА === */
+/* ═══════════════════════════════════════════════════════════════════ */
+/* БОЕВАЯ СИСТЕМА */
+/* ═══════════════════════════════════════════════════════════════════ */
 
-/* Оружие (по умолчанию скрыто) */
 #Weapon {
     opacity: 0;
     will-change: opacity;
@@ -249,7 +373,6 @@
     opacity: 1;
 }
 
-/* Атака */
 .attacking #HandRight {
     transform-box: fill-box;
     transform-origin: 0% 50%;
@@ -257,13 +380,15 @@
     will-change: transform;
 }
 
-/* Попадание */
-.hit {
+.character-container.hit .svg-char {
     filter: brightness(1.3);
     animation: none;
 }
 
-/* Победитель */
+/* ═══════════════════════════════════════════════════════════════════ */
+/* ПОБЕДИТЕЛЬ / ПРОИГРАВШИЙ */
+/* ═══════════════════════════════════════════════════════════════════ */
+
 .winner {
     position: relative;
     will-change: filter;
@@ -272,7 +397,7 @@
     .winner::before {
         content: "👑";
         position: absolute;
-        bottom: 146%;
+        bottom: 130%;
         left: 50%;
         transform: translateX(-50%);
         font-size: 1cqw;
@@ -280,7 +405,26 @@
         will-change: transform;
     }
 
-/* Всплывающие числа (урон, отхил) */
+.loser {
+    position: relative;
+    will-change: filter;
+}
+
+    .loser::before {
+        content: "💔";
+        position: absolute;
+        bottom: 110%;
+        left: 50%;
+        transform: translateX(-50%);
+        font-size: 1cqw;
+        animation: pulse 2s infinite;
+        will-change: transform;
+    }
+
+/* ═══════════════════════════════════════════════════════════════════ */
+/* ВСПЛЫВАЮЩИЕ ЧИСЛА */
+/* ═══════════════════════════════════════════════════════════════════ */
+
 .float-number {
     position: absolute;
     left: 50%;
@@ -304,7 +448,9 @@
         color: #55ff55;
     }
 
-/*ЛиберБорд*/
+/* ═══════════════════════════════════════════════════════════════════ */
+/* ЛИДЕРБОРД */
+/* ═══════════════════════════════════════════════════════════════════ */
 
 .game-leaderboard {
     position: absolute;
@@ -318,6 +464,7 @@
     width: 17.5%;
     height: 80%;
     text-align: left;
+    contain: layout;
 }
 
 .leaderboard-header {
@@ -382,6 +529,10 @@
     padding: 8px 0;
 }
 
+/* ═══════════════════════════════════════════════════════════════════ */
+/* ТИКЕР */
+/* ═══════════════════════════════════════════════════════════════════ */
+
 .ticker-container {
     position: absolute;
     overflow: hidden;
@@ -391,20 +542,40 @@
     right: 0.5cqw;
     font-weight: bold;
     width: 95%;
+    contain: paint;
 }
 
 .ticker-text {
     display: inline-block;
     animation: ticker-scroll 20s linear infinite;
-    padding-left: 100%; 
+    padding-left: 100%;
+    will-change: transform;
 }
 
-@keyframes ticker-scroll {
-    0% {
-        transform: translateX(0);
-    }
+/* ═══════════════════════════════════════════════════════════════════ */
+/* БИНТЫ / ШЛЕМЫ */
+/* ═══════════════════════════════════════════════════════════════════ */
 
-    100% {
-        transform: translateX(-100%);
-    }
+.character-container .bandage {
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.2s ease;
+}
+
+.character-container.loser .bandage {
+    opacity: 1;
+}
+
+.character-container .helmet {
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.2s ease;
+}
+
+.character-container.winner .helmet {
+    opacity: 1;
+}
+
+.character-container.winner .mask-node {
+    opacity: 0;
 }

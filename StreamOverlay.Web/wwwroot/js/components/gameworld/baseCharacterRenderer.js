@@ -14,6 +14,7 @@
         this._currentState = null;
         this._currentDirection = null;
         this._winnerFlag = false;
+        this._loserFlag = false;
         this._hitTimeout = null;
     }
 
@@ -69,9 +70,8 @@
     }
 
     setState(newState) {
-        if (this._currentState === newState) return; // без изменений – не трогаем DOM
+        if (this._currentState === newState) return;
         if (this.container) {
-           
             if (this._currentState) {
                 this.container.classList.remove(this._currentState);
             }
@@ -80,7 +80,6 @@
         }
     }
 
-    // Управление направлением (scaleX)
     setDirection(vx) {
         const svg = this.container?.querySelector('svg');
         if (!svg) return;
@@ -88,7 +87,7 @@
         let newDirection = null;
         if (vx > 0) newDirection = 'right';
         else if (vx < 0) newDirection = 'left';
-        else newDirection = this._currentDirection; // если vx === 0, сохраняем последнее
+        else newDirection = this._currentDirection;
 
         if (newDirection !== null && this._currentDirection !== newDirection) {
             this._currentDirection = newDirection;
@@ -112,7 +111,6 @@
         }
     }
 
-    // Модификатор "победитель" (добавляет/удаляет класс winner)
     setWinner(isWinner) {
         if (!this.container) return;
         if (isWinner === this._winnerFlag) return;
@@ -124,7 +122,17 @@
         }
     }
 
-    // Эффект удара (временный класс "hit")
+    setLoser(isLoser) {
+        if (!this.container) return;
+        if (isLoser === this._loserFlag) return;
+        this._loserFlag = isLoser;
+        if (isLoser) {
+            this.container.classList.add('loser');
+        } else {
+            this.container.classList.remove('loser');
+        }
+    }
+
     playHitEffect() {
         if (!this.container) return;
         if (this._hitTimeout) clearTimeout(this._hitTimeout);
@@ -166,15 +174,27 @@
         }
     }
 
-    updateBubble(htmlMessage) {
+    updateBubble(htmlMessage, type = null) {
         if (!this.bubbleEl) return;
         clearTimeout(this.bubbleTimeout);
+
+        // Сброс предыдцщих классов, оставляем 'bubble'
+        this.bubbleEl.className = 'bubble';
+        if (type && ['info', 'warning', 'error'].includes(type)) {
+            this.bubbleEl.classList.add(`bubble-${type}`);
+        }
+
         this.bubbleEl.innerHTML = htmlMessage;
         this.bubbleEl.style.opacity = '1';
         this.bubbleEl.style.display = 'block';
+
+        let duration = 7000;
+        if (type === 'error') duration = 10000;
+        else if (type === 'warning') duration = 8000;
+
         this.bubbleTimeout = setTimeout(() => {
             this.bubbleEl.style.opacity = '0';
-        }, 7000);
+        }, duration);
     }
 
     destroy(animated = false) {
@@ -236,8 +256,7 @@
         }, 600);
     }
 
-
-    setFacing(direction) { 
+    setFacing(direction) {
         const svg = this.container?.querySelector('svg');
         if (!svg) return;
         if (direction === 'right') {
