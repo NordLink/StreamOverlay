@@ -486,6 +486,16 @@ export class GameWorld {
         }
         return null;
     }
+
+    // Раскрашивает ник для вставки в сообщение
+    _colorizeNickname(nickname, color) {
+        const safeNick = this._escapeHtml(nickname);
+        if (color) {
+            return `<span style="color: ${color};">${safeNick}</span>`;
+        }
+        return safeNick;
+    }
+
     // Ищет персонажей по никнейму(без учёта платформы)
     _findCharacterByNickname(nickname, excludeKey = null) {
         const results = [];
@@ -508,8 +518,9 @@ export class GameWorld {
         const exactKey = `${platform}:${nickname}`;
         if (this.characters.has(exactKey)) {
             const target = this.characters.get(exactKey);
-            if (target.physics.isLoser) return { success: false, message: `${nickname} временно выведен из строя и не может сражаться` };
-            if (target.physics.isFighting) return { success: false, message: `Цель ${nickname} уже в бою` };
+            const coloredNick = this._colorizeNickname(nickname, target.renderer.options.color);
+            if (target.physics.isLoser) return { success: false, message: `${coloredNick} временно выведен из строя и не может сражаться` };
+            if (target.physics.isFighting) return { success: false, message: `Цель ${coloredNick} уже в бою` };
             return { success: true, targetKey: exactKey };
         }
         const candidates = this._findCharacterByNickname(nickname);
@@ -517,14 +528,41 @@ export class GameWorld {
         if (candidates.length === 1) {
             const targetKey = candidates[0].key;
             const target = candidates[0].entry;
-            if (target.physics.isLoser) return { success: false, message: `Цель ${nickname} временно не может драться (лузер)` };
-            if (target.physics.isFighting) return { success: false, message: `Цель ${nickname} уже в бою` };
+            if (target.physics.isLoser) return { success: false, message: `Цель ${coloredNick} временно не может драться (лузер)` };
+            if (target.physics.isFighting) return { success: false, message: `Цель ${coloredNick} уже в бою` };
             return { success: true, targetKey };
         }
         const platformList = candidates.map(c => c.key.split(':')[0]).join(', ');
         return { success: false, message: `Найдено несколько персонажей с ником "${nickname}" на платформах: ${platformList}. Уточните, указав платформу, например: ${candidates[0].key}` };
     }
-    // Главная точка входа из чата. Обрабатывает команды !дуэль, !статистика, а также обычные сообщения (создание/обновление персонажа).
+
+    // Показывает сообщение атакующему, создавая персонажа при необходимости.   
+    _showMessageToAttacker(attackerKey, color, userName, message, type = 'warning') {
+        let attacker = this.characters.get(attackerKey);
+        if (!attacker) {
+            this._createCharacter(attackerKey, color, userName, message, [], type);
+            attacker = this.characters.get(attackerKey);
+        }
+        if (attacker) {
+            attacker.renderer.updateBubble(message, type);
+        }
+    }
+
+    _ensureCharacter(key, color, name, defaultMessage, type = 'info') {
+        let character = this.characters.get(key);
+        if (!character) {
+            this._createCharacter(key, color, name, defaultMessage, [], type);
+            character = this.characters.get(key);
+        } else {
+            if (!character.physics.isFighting && !character.physics.isLoser) {
+                character.physics.dieTime = Date.now() + this.config.MAX_LIFETIME;
+                character.renderer.showHeal(100);
+            }
+            character.renderer.updateBubble(defaultMessage, type);
+        }
+        return character;
+    }
+
     spawnFromMessage(payload) {
         const platform = (payload?.platform || "unknown").toLowerCase();
         const userName = payload?.user || "Anonymous";
@@ -533,75 +571,65 @@ export class GameWorld {
         const emotes = payload?.emotes || [];
         const attackerKey = `${platform}:${userName.trim().toLowerCase()}`;
 
+        // Обрезаем пробелы и проверяем, начинается ли сообщение с '!'
         const trimmedMsg = message.trim();
         const isCommand = trimmedMsg.startsWith('!') && trimmedMsg.length > 1 && trimmedMsg[1] !== ' ';
 
         if (trimmedMsg.toLowerCase().startsWith('!дуэль')) {
-            // проверка идёт ли уже дуэль
+            // Глобальная блокировка дуэли
             if (this.isDuelInProgress) {
-                let existing = this.characters.get(attackerKey);
-                if (!existing) {
-                    this._createCharacter(attackerKey, color, userName, "Сейчас идёт другая дуэль! Подождите...", [], 'warning');
-                } else {
-                    existing.renderer.updateBubble("Сейчас идёт другая дуэль! Подождите...", 'warning');
-                }
+                this._showMessageToAttacker(attackerKey, color, userName, "Сейчас идёт другая дуэль! Подождите...", 'warning');
                 return;
             }
 
             const match = message.trim().match(/^!дуэль\s+(.+)$/i);
-            const hasTarget = !!match;
-            const targetSpec = hasTarget ? match[1].trim() : null;
-
-            let attacker = this.characters.get(attackerKey);
-            let isNew = false;
-            if (!attacker) {
-                const initialMessage = hasTarget ? `Поиск цели "${targetSpec}"...` : "Укажите никнейм цели";
-                this._createCharacter(attackerKey, color, userName, initialMessage, []);
-                attacker = this.characters.get(attackerKey);
-                isNew = true;
-            } else {
-                if (!attacker.physics.isFighting && !attacker.physics.isLoser) {
-                    attacker.physics.dieTime = Date.now() + this.config.MAX_LIFETIME;
-                    attacker.renderer.showHeal(100);
-                }
-            }
-            if (!attacker) return;
-
-            if (!hasTarget || !targetSpec) {
-                attacker.renderer.updateBubble("Укажите никнейм цели! </br> Например: !дуэль Никнейм или !дуэль twitch:никнейм", 'warning');
+            if (!match) {
+                this._showMessageToAttacker(attackerKey, color, userName, "Укажите никнейм цели! </br> Например: !дуэль Никнейм или !дуэль twitch:никнейм", 'warning');
                 return;
             }
-            if (attacker.physics.isLoser) {
-                attacker.renderer.updateBubble("Вы потерпели поражение и временно не можете участвовать в сражениях", 'warning');
+            const targetSpec = match[1].trim();
+
+            // Проверка существующего атакующего на статус "лузер"
+            const existingAttacker = this.characters.get(attackerKey);
+            if (existingAttacker && existingAttacker.physics.isLoser) {
+                this._showMessageToAttacker(attackerKey, color, userName, "Вы потерпели поражение и временно не можете участвовать в сражениях", 'warning');
                 return;
             }
 
+            // Разрешаем цель (проверка существования, однозначности, статусов цели)
             const resolution = this._resolveDuelTarget(attackerKey, targetSpec);
             if (!resolution.success) {
-                attacker.renderer.updateBubble(resolution.message, 'warning');
+                this._showMessageToAttacker(attackerKey, color, userName, resolution.message, 'warning');
                 return;
             }
             const targetKey = resolution.targetKey;
             const target = this.characters.get(targetKey);
             if (!target) {
-                attacker.renderer.updateBubble("Цель исчезла. Попробуйте ещё раз");
-                if (isNew) { attacker.renderer.destroy(true); this.characters.delete(attackerKey); }
+                this._showMessageToAttacker(attackerKey, color, userName, "Цель исчезла. Попробуйте ещё раз", 'warning');
                 return;
             }
-            if (target === attacker) {
-                attacker.renderer.updateBubble("Нельзя вызвать самого себя", 'warning');
-                if (isNew) { attacker.renderer.destroy(true); this.characters.delete(attackerKey); }
+
+            // Запрет на вызов самого себя
+            if (attackerKey === targetKey) {
+                this._showMessageToAttacker(attackerKey, color, userName, "Нельзя вызвать самого себя", 'warning');
                 return;
             }
-            const targetDisplayNick = target.physics.nickname;
-            this._updateCharacterBubble(attacker.renderer, `Вызываю на дуэль ${targetDisplayNick}`, [], 'info');
+       
+            if (existingAttacker && existingAttacker.physics.isFighting) {
+                this._showMessageToAttacker(attackerKey, color, userName, "Вы уже в бою", 'warning');
+                return;
+            }
 
-            if (attacker.physics.isFighting) { attacker.renderer.updateBubble("Вы уже в бою"); return; }
-            if (target.physics.isFighting) { attacker.renderer.updateBubble("Цель уже сражается"); return; }
-            if (attacker.physics.isLoser) { attacker.renderer.updateBubble("Вы временно не можете драться (лузер)"); return; }
-            if (target.physics.isLoser) { attacker.renderer.updateBubble("Цель временно не может драться (лузер)"); return; }
+            // Создаём/обновляем атакующего с финальным сообщением
+            const coloredTarget = this._colorizeNickname(target.physics.nickname, target.renderer.options.color);
+            const attacker = this._ensureCharacter(attackerKey, color, userName, `Вызываю на дуэль ${coloredTarget}`, 'info');
+            if (!attacker) return;
 
-            target.renderer.updateBubble(`Принимаю вызов ${attacker.physics.nickname}!`, 'info');
+            // Цель принимает вызов
+            const coloredAttackerNick = this._colorizeNickname(attacker.physics.nickname, attacker.renderer.options.color);
+            target.renderer.updateBubble(`Принимаю вызов ${coloredAttackerNick}`, 'info');
+
+
             this._startFight(attackerKey, targetKey);
             return;
         }
@@ -620,7 +648,8 @@ export class GameWorld {
                 } else {
                     let callerChar = this.characters.get(callerKey);
                     if (!callerChar) {
-                        this._createCharacter(callerKey, color, userName, "Некорректный формат. Используйте: ник или платформа:ник", []);
+                        this._createCharacter(callerKey, color, userName,
+                            "Некорректный формат. Используйте: ник или платформа:ник", []);
                         callerChar = this.characters.get(callerKey);
                     }
                     if (callerChar) callerChar.renderer.updateBubble("Некорректный формат. Используйте: ник или платформа:ник");
@@ -657,7 +686,7 @@ export class GameWorld {
                     if (existingChar && existingChar.renderer.options.color) colorForName = existingChar.renderer.options.color;
                     const coloredName = colorForName ? `<span style="color: ${colorForName};">${this._escapeHtml(displayName)}</span>` : this._escapeHtml(displayName);
                     const isSelf = (playerKey === callerKey);
-                    if (isSelf) messageText = `⚔️ Игрок ${coloredName} ещё участвовал в боях 😔`;
+                    if (isSelf) messageText = `⚔️ Игрок ${coloredName} ещё не участвовал в боях 😔`;
                     else messageText = `⚔️ Нет данных для игрока "${coloredName}"`;
                 }
                 targetChar.renderer.updateBubble(messageText, 'info');
@@ -667,12 +696,13 @@ export class GameWorld {
             return;
         }
 
-        // Если неизвестная команда (начинается с ! и не пробел)
         if (isCommand) {
             const firstWord = trimmedMsg.split(/\s+/)[0].toLowerCase();
             let entry = this.characters.get(attackerKey);
-            if (!entry) this._createCharacter(attackerKey, color, userName, `Неизвестная команда: ${firstWord}`, [], 'error');
-            else {
+            if (!entry) {
+                this._createCharacter(attackerKey, color, userName,
+                    `Неизвестная команда: ${firstWord}`, [], 'error');
+            } else {
                 if (!entry.physics.isFighting && !entry.physics.isLoser) {
                     entry.physics.dieTime = Date.now() + this.config.MAX_LIFETIME;
                     entry.renderer.showHeal(100);
@@ -769,7 +799,9 @@ export class GameWorld {
         this._updateContainerPosition(renderer, physics);
         if (message) {
             const truncated = message.length > this.config.MAX_MESSAGE_LENGTH ? message.substring(0, this.config.MAX_MESSAGE_LENGTH) + '...' : message;
-            const formatted = formatMessageWithEmotes(truncated, emotes);
+            // Если сообщение уже содержит HTML (например, <span> для цвета), не применяем formatMessageWithEmotes
+            const hasHtml = /<[^>]+>/.test(truncated);
+            const formatted = hasHtml ? truncated : formatMessageWithEmotes(truncated, emotes);
             renderer.updateBubble(formatted, bubbleType);
         }
     }

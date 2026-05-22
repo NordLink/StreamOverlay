@@ -22,6 +22,12 @@
         this.container = document.createElement('div');
         this.container.className = 'character-container';
         this.container.style.position = 'absolute';
+
+        // --- ДЛЯ ОПТИМИЗАЦИИ В OBS ---
+        this.container.style.left = '0px';
+        this.container.style.top = '0px';
+        this.container.style.willChange = 'transform';
+
         this.container.style.overflow = 'visible';
         this.container.style.width = `${this.options.fullWidth}px`;
         this.container.style.height = `${this.options.fullHeight}px`;
