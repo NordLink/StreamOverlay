@@ -1,6 +1,7 @@
 ﻿import { resolveMessageColor } from '../../utils/colorUtils.js';
 import { formatMessageWithEmotes } from '../../utils/messageUtils.js';
 import TurtleRenderer from './turtleRenderer.js';
+import PortalEffect from './portalEffect.js';
 
 // СИСТЕМЫ
 
@@ -86,7 +87,7 @@ class AISystem {
                 }
                 physics.actionTimer = 500; // задержка перед следующим действием
                 physics.state = 'walking';
-                return; // не выполняем обычную логику блуждания
+                return;
             }
         }
 
@@ -294,9 +295,15 @@ export class GameWorld {
         this.connectionService = connectionService;
         this.leaderboardElement = null;
 
+        this.portalEffect = new PortalEffect(elementId);
+        this.pendingSpawns = new Map(); // key -> { timeout, portal, resolve }
+
         this.isDuelInProgress = false;
         this.currentDuelZone = null;
         this.currentDuelParticipants = null;
+
+        // Для предотвращения параллельного создания одного персонажа
+        this.pendingCreations = new Map(); // key -> Promise
 
         this._animationLoop = this._animationLoop.bind(this);
         this._handleResize = this._handleResize.bind(this);
@@ -329,6 +336,10 @@ export class GameWorld {
         if (this.leaderboardElement) {
             this.leaderboardElement.remove();
             this.leaderboardElement = null;
+        }
+     
+        if (this.portalEffect && this.portalEffect.destroy) {
+            this.portalEffect.destroy();
         }
         this.isDuelInProgress = false;
         this.currentDuelZone = null;
@@ -519,6 +530,9 @@ export class GameWorld {
         if (this.characters.has(exactKey)) {
             const target = this.characters.get(exactKey);
             const coloredNick = this._colorizeNickname(nickname, target.renderer.options.color);
+            if (target.physics.isRemoving) {
+                return { success: false, message: `${coloredNick} сейчас исчезает и не может сражаться` };
+            }
             if (target.physics.isLoser) return { success: false, message: `${coloredNick} временно выведен из строя и не может сражаться` };
             if (target.physics.isFighting) return { success: false, message: `Цель ${coloredNick} уже в бою` };
             return { success: true, targetKey: exactKey };
@@ -528,7 +542,11 @@ export class GameWorld {
         if (candidates.length === 1) {
             const targetKey = candidates[0].key;
             const target = candidates[0].entry;
-            if (target.physics.isLoser) return { success: false, message: `Цель ${coloredNick} временно не может драться (лузер)` };
+            const coloredNick = this._colorizeNickname(nickname, target.renderer.options.color);
+            if (target.physics.isRemoving) {
+                return { success: false, message: `${coloredNick} сейчас исчезает и не может сражаться` };
+            }
+            if (target.physics.isLoser) return { success: false, message: `Цель ${coloredNick} временно выведен из строя и не может сражаться` };
             if (target.physics.isFighting) return { success: false, message: `Цель ${coloredNick} уже в бою` };
             return { success: true, targetKey };
         }
@@ -544,15 +562,19 @@ export class GameWorld {
             attacker = this.characters.get(attackerKey);
         }
         if (attacker) {
+            if (!attacker.physics.isFighting && !attacker.physics.isLoser) {
+                attacker.physics.dieTime = Date.now() + this.config.MAX_LIFETIME;
+                attacker.renderer.showHeal(100);
+            }
             attacker.renderer.updateBubble(message, type);
         }
     }
 
-    _ensureCharacter(key, color, name, defaultMessage, type = 'info') {
+    // Асинхронная версия _ensureCharacter
+    async _ensureCharacterAsync(key, color, name, defaultMessage, type = 'info') {
         let character = this.characters.get(key);
         if (!character) {
-            this._createCharacter(key, color, name, defaultMessage, [], type);
-            character = this.characters.get(key);
+            character = await this._createCharacter(key, color, name, defaultMessage, [], type);
         } else {
             if (!character.physics.isFighting && !character.physics.isLoser) {
                 character.physics.dieTime = Date.now() + this.config.MAX_LIFETIME;
@@ -563,7 +585,7 @@ export class GameWorld {
         return character;
     }
 
-    spawnFromMessage(payload) {
+    async spawnFromMessage(payload) {
         const platform = (payload?.platform || "unknown").toLowerCase();
         const userName = payload?.user || "Anonymous";
         const color = resolveMessageColor(payload);
@@ -576,7 +598,7 @@ export class GameWorld {
         const isCommand = trimmedMsg.startsWith('!') && trimmedMsg.length > 1 && trimmedMsg[1] !== ' ';
 
         if (trimmedMsg.toLowerCase().startsWith('!дуэль')) {
-            // Глобальная блокировка дуэли
+
             if (this.isDuelInProgress) {
                 this._showMessageToAttacker(attackerKey, color, userName, "Сейчас идёт другая дуэль! Подождите...", 'warning');
                 return;
@@ -589,46 +611,55 @@ export class GameWorld {
             }
             const targetSpec = match[1].trim();
 
-            // Проверка существующего атакующего на статус "лузер"
             const existingAttacker = this.characters.get(attackerKey);
             if (existingAttacker && existingAttacker.physics.isLoser) {
                 this._showMessageToAttacker(attackerKey, color, userName, "Вы потерпели поражение и временно не можете участвовать в сражениях", 'warning');
                 return;
             }
 
-            // Разрешаем цель (проверка существования, однозначности, статусов цели)
             const resolution = this._resolveDuelTarget(attackerKey, targetSpec);
             if (!resolution.success) {
                 this._showMessageToAttacker(attackerKey, color, userName, resolution.message, 'warning');
                 return;
             }
             const targetKey = resolution.targetKey;
-            const target = this.characters.get(targetKey);
+            let target = this.characters.get(targetKey);
             if (!target) {
                 this._showMessageToAttacker(attackerKey, color, userName, "Цель исчезла. Попробуйте ещё раз", 'warning');
                 return;
             }
 
-            // Запрет на вызов самого себя
             if (attackerKey === targetKey) {
                 this._showMessageToAttacker(attackerKey, color, userName, "Нельзя вызвать самого себя", 'warning');
                 return;
             }
-       
+
             if (existingAttacker && existingAttacker.physics.isFighting) {
                 this._showMessageToAttacker(attackerKey, color, userName, "Вы уже в бою", 'warning');
                 return;
             }
 
-            // Создаём/обновляем атакующего с финальным сообщением
             const coloredTarget = this._colorizeNickname(target.physics.nickname, target.renderer.options.color);
-            const attacker = this._ensureCharacter(attackerKey, color, userName, `Вызываю на дуэль ${coloredTarget}`, 'info');
+            let attacker = await this._ensureCharacterAsync(attackerKey, color, userName, `Вызываю на дуэль ${coloredTarget}`, 'info');
             if (!attacker) return;
 
-            // Цель принимает вызов
+            target = this.characters.get(targetKey);
+            attacker = this.characters.get(attackerKey);
+
+            if (!target || target.physics.isRemoving || target.physics.isLoser || target.physics.isFighting) {
+                const targetNick = target?.physics.nickname || targetKey.split(':')[1] || 'Неизвестный';
+                const targetColor = target?.renderer?.options?.color || color;
+                const coloredNick = this._colorizeNickname(targetNick, targetColor);
+                this._showMessageToAttacker(attackerKey, color, userName, `${coloredNick} недоступен для дуэли`, 'warning');
+                return;
+            }
+
+            if (!attacker || attacker.physics.isRemoving || attacker.physics.isFighting) {
+                return;
+            }
+
             const coloredAttackerNick = this._colorizeNickname(attacker.physics.nickname, attacker.renderer.options.color);
             target.renderer.updateBubble(`Принимаю вызов ${coloredAttackerNick}`, 'info');
-
 
             this._startFight(attackerKey, targetKey);
             return;
@@ -646,27 +677,14 @@ export class GameWorld {
                     const { platform: p, nickname: n } = parsed;
                     targetKey = `${p}:${n.toLowerCase()}`;
                 } else {
-                    let callerChar = this.characters.get(callerKey);
-                    if (!callerChar) {
-                        this._createCharacter(callerKey, color, userName,
-                            "Некорректный формат. Используйте: ник или платформа:ник", []);
-                        callerChar = this.characters.get(callerKey);
-                    }
+                    let callerChar = await this._ensureCharacterAsync(callerKey, color, userName, "Некорректный формат. Используйте: ник или платформа:ник", 'info');
                     if (callerChar) callerChar.renderer.updateBubble("Некорректный формат. Используйте: ник или платформа:ник");
                     return;
                 }
             }
-            let callerChar = this.characters.get(callerKey);
-            if (!callerChar) {
-                this._createCharacter(callerKey, color, userName, "Запрос статистики...", []);
-                callerChar = this.characters.get(callerKey);
-            } else {
-                if (!callerChar.physics.isFighting && !callerChar.physics.isLoser) {
-                    callerChar.physics.dieTime = Date.now() + this.config.MAX_LIFETIME;
-                    callerChar.renderer.showHeal(100);
-                }
-                callerChar.renderer.updateBubble("Запрос статистики...");
-            }
+            let callerChar = await this._ensureCharacterAsync(callerKey, color, userName, "Запрос статистики...", 'info');
+            if (!callerChar) return;
+
             this.connectionService.onPlayerStatsCallback = (respCallerKey, playerKey, stats) => {
                 if (respCallerKey !== callerKey) return;
                 const targetChar = this.characters.get(callerKey);
@@ -700,7 +718,7 @@ export class GameWorld {
             const firstWord = trimmedMsg.split(/\s+/)[0].toLowerCase();
             let entry = this.characters.get(attackerKey);
             if (!entry) {
-                this._createCharacter(attackerKey, color, userName,
+                await this._createCharacter(attackerKey, color, userName,
                     `Неизвестная команда: ${firstWord}`, [], 'error');
             } else {
                 if (!entry.physics.isFighting && !entry.physics.isLoser) {
@@ -712,6 +730,7 @@ export class GameWorld {
             return;
         }
 
+        // Обычное сообщение
         if (this.characters.has(attackerKey)) {
             const entry = this.characters.get(attackerKey);
             if (!entry.physics.isFighting && !entry.physics.isLoser) {
@@ -720,17 +739,161 @@ export class GameWorld {
             }
             this._updateCharacterBubble(entry.renderer, message, emotes);
         } else {
+            // Запускаем асинхронное создание, но не ждём
             this._createCharacter(attackerKey, color, userName, message, emotes);
         }
     }
 
-    // Создаёт нового персонажа (рендерер + физическое состояние).
-    // При превышении MAX_CHARACTERS удаляется игрок (не лузер) с наименьшим оставшимся временем жизни.
-    _createCharacter(key, color, nickname, message, emotes, bubbleType = null) {
+    async _spawnCharacterWithPortal(key, color, nickname, message, emotes, bubbleType = null) {
         const worldWidth = this.world.offsetWidth;
         const worldHeight = this.world.offsetHeight;
-        if (worldWidth === 0) return;
+        if (worldWidth === 0) return null;
 
+        // Рассчет позиции спавна (случайная по X, на земле по Y)
+        const fullSizePx = (this.config.CHAR_SIZE / 100) * worldWidth;
+        const colliderWidthPx = fullSizePx * (this.config.COLLIDER_WIDTH_PERCENT / 100);
+        const colliderOffsetX = (fullSizePx - colliderWidthPx) / 2;
+        const colliderX = Math.random() * (worldWidth - colliderWidthPx);
+        const colliderY = worldHeight - fullSizePx;
+
+        // Спавн портала в точке появления
+        const portalCenterX = colliderX + colliderWidthPx / 2;
+        const portalCenterY = colliderY + fullSizePx * 0.4;
+
+        const portal = this.portalEffect.spawnPortal(
+            portalCenterX,
+            portalCenterY,
+            worldWidth,
+            worldHeight,
+            { widthPercent: 8, heightPercent: 80 }
+        );
+
+        // Открываем портал и ждём завершения анимации
+        await portal.open();
+
+        // Задержка перед появлением персонажа
+        await new Promise(resolve => setTimeout(resolve, 1000));
+
+        const physics = {
+            colliderX, colliderY,
+            colliderWidth: colliderWidthPx,
+            colliderHeight: fullSizePx,
+            colliderOffsetX,
+            fullWidth: fullSizePx,
+            fullHeight: fullSizePx,
+            vx: 0, vy: 0,
+            state: 'idle',
+            isGrounded: true,
+            actionTimer: 1000,
+            dieTime: Date.now() + this.config.MAX_LIFETIME,
+            isFighting: false,
+            fightTargetKey: null,
+            fightMoveToTarget: false,
+            fightAttackTimer: 0,
+            fightCanAttack: false,
+            fightTimeout: null,
+            fightTargetX: null,
+            fightSide: null,
+            isAttacker: false,
+            key: key,
+            platform: key.split(':')[0],
+            nickname: nickname,
+            isLoser: false,
+            loserUntil: 0,
+            isRemoving: false
+        };
+
+        // Ререндер
+        const characterType = this.config.character;
+        const RendererClass = this.characterRenderers.get(characterType) || this.characterRenderers.get('turtle');
+        const renderer = new RendererClass(this.world, {
+            fullWidth: physics.fullWidth,
+            fullHeight: physics.fullHeight,
+            colliderWidth: physics.colliderWidth,
+            colliderHeight: physics.colliderHeight,
+            colliderOffsetX: physics.colliderOffsetX,
+            debugCollider: this.config.DEBUG_COLLIDER,
+            color, nickname, message, emotes,
+        });
+
+        // Добавляем в коллекцию и инициализируем
+        this.characters.set(key, { physics, renderer });
+        renderer.init();
+        this._updateContainerPosition(renderer, physics);
+
+        // Показываем сообщение (после того как персонаж полностью появился)
+        if (message) {
+            const truncated = message.length > this.config.MAX_MESSAGE_LENGTH
+                ? message.substring(0, this.config.MAX_MESSAGE_LENGTH) + '...'
+                : message;
+            const hasHtml = /<[^>]+>/.test(truncated);
+            const formatted = hasHtml ? truncated : formatMessageWithEmotes(truncated, emotes);
+            renderer.updateBubble(formatted, bubbleType);
+        }
+
+        // Закрываем портал после появления персонажа
+        await portal.close();
+
+        // Возвращаем ссылку на персонажа для дальнейшего использования
+        return { physics, renderer };
+    }
+
+    // Асинхронное создание персонажа (с порталом)
+    async _createCharacter(key, color, nickname, message, emotes, bubbleType = null) {
+        // Если уже создаётся – ждём существующий Promise
+        if (this.pendingCreations.has(key)) {
+            return this.pendingCreations.get(key);
+        }
+
+        const createPromise = (async () => {
+            const worldWidth = this.world.offsetWidth;
+            if (worldWidth === 0) return null;
+
+            // Проверка лимита персонажей
+            if (this.characters.size >= this.config.MAX_CHARACTERS) {
+                let oldestKey = null;
+                let minDieTime = Infinity;
+                for (let [k, entry] of this.characters) {
+                    if (!entry.physics.isLoser && entry.physics.dieTime < minDieTime) {
+                        minDieTime = entry.physics.dieTime;
+                        oldestKey = k;
+                    }
+                }
+                if (!oldestKey) oldestKey = this.characters.keys().next().value;
+                if (oldestKey) {
+                    const entry = this.characters.get(oldestKey);
+                    entry.renderer.destroy(true);
+                    this.characters.delete(oldestKey);
+                }
+            }
+
+            try {
+                // Попытка создать через портал
+                const result = await this._spawnCharacterWithPortal(key, color, nickname, message, emotes, bubbleType);
+                if (result) return result;
+            } catch (err) {
+                console.error('Ошибка при спавне через портал:', err);
+            }
+
+            // Fallback: синхронное создание без портала
+            return this._createCharacterFallback(key, color, nickname, message, emotes, bubbleType);
+        })();
+
+        this.pendingCreations.set(key, createPromise);
+        try {
+            return await createPromise;
+        } finally {
+            this.pendingCreations.delete(key);
+        }
+    }
+
+    // Синхронное создание персонажа (без портала, для fallback)
+    _createCharacterFallback(key, color, nickname, message, emotes, bubbleType = null) {
+        const worldWidth = this.world.offsetWidth;
+        const worldHeight = this.world.offsetHeight;
+        if (worldWidth === 0) return null;
+
+        // Лимит персонажей
         if (this.characters.size >= this.config.MAX_CHARACTERS) {
             let oldestKey = null;
             let minDieTime = Infinity;
@@ -748,6 +911,7 @@ export class GameWorld {
             }
         }
 
+        // Расчёт размеров и позиции
         const fullSizePx = (this.config.CHAR_SIZE / 100) * worldWidth;
         const colliderWidthPx = fullSizePx * (this.config.COLLIDER_WIDTH_PERCENT / 100);
         const colliderOffsetX = (fullSizePx - colliderWidthPx) / 2;
@@ -797,13 +961,17 @@ export class GameWorld {
         this.characters.set(key, { physics, renderer });
         renderer.init();
         this._updateContainerPosition(renderer, physics);
+
         if (message) {
-            const truncated = message.length > this.config.MAX_MESSAGE_LENGTH ? message.substring(0, this.config.MAX_MESSAGE_LENGTH) + '...' : message;
-            // Если сообщение уже содержит HTML (например, <span> для цвета), не применяем formatMessageWithEmotes
+            const truncated = message.length > this.config.MAX_MESSAGE_LENGTH
+                ? message.substring(0, this.config.MAX_MESSAGE_LENGTH) + '...'
+                : message;
             const hasHtml = /<[^>]+>/.test(truncated);
             const formatted = hasHtml ? truncated : formatMessageWithEmotes(truncated, emotes);
             renderer.updateBubble(formatted, bubbleType);
         }
+
+        return { physics, renderer };
     }
 
     //Начинает дуэль между двумя персонажами.
@@ -813,7 +981,7 @@ export class GameWorld {
     _startFight(keyA, keyB) {
         const charA = this.characters.get(keyA);
         const charB = this.characters.get(keyB);
-        if (!charA || !charB) return;
+        if (!charA || !charB || charA.physics.isRemoving || charB.physics.isRemoving) return;
 
         const worldWidth = this.world.offsetWidth;
         if (worldWidth === 0) return;
@@ -1024,6 +1192,42 @@ export class GameWorld {
         rightChar.physics.fightAttackTimer = 0;
     }
 
+    async _removeCharacterWithPortal(key, entry) {
+        const { physics, renderer } = entry;
+        if (physics.isRemoving) return;
+        physics.isRemoving = true;
+
+        // остановка персонажа
+        physics.vx = 0;
+        physics.vy = 0;
+        physics.isGrounded = true;      // чтобы не было анимации падения
+        renderer.setState('Idle')         // визуальное состояние перед исчезновением
+
+        const portalCenterX = physics.colliderX + physics.colliderWidth / 2;
+        const portalCenterY = physics.colliderY + physics.fullHeight * 0.4;
+
+        const worldWidth = this.world.offsetWidth;
+        const worldHeight = this.world.offsetHeight;
+
+        const portal = this.portalEffect.spawnPortal(
+            portalCenterX,
+            portalCenterY,
+            worldWidth,
+            worldHeight,
+            { widthPercent: 8, heightPercent: 80 }
+        );
+
+        await portal.open();
+
+        await new Promise(resolve => setTimeout(resolve, 300));
+
+        if (physics.fightTimeout) clearTimeout(physics.fightTimeout);
+        renderer.destroy(true);
+        this.characters.delete(key);
+
+        await portal.close();
+    }
+
     // Обработка изменения размера окна – пересчёт размеров персонажей и скорости
     _handleResize() {
         const oldSpeed = this.walkSpeedPxPerFrame;
@@ -1104,6 +1308,7 @@ export class GameWorld {
         for (let [key, entry] of this.characters) {
             const physics = entry.physics;
             const renderer = entry.renderer;
+            if (physics.isRemoving) continue;
             // Снятие статуса лузера по таймеру
             if (physics.isLoser && physics.loserUntil && now > physics.loserUntil) {
                 physics.isLoser = false;
@@ -1142,9 +1347,8 @@ export class GameWorld {
                     this._endFight(physics.fightTargetKey, key);
                     continue;
                 } else {
-                    if (physics.fightTimeout) clearTimeout(physics.fightTimeout);
-                    renderer.destroy(true);
-                    this.characters.delete(key);
+                    if (physics.isRemoving) continue; // необязательно, но для ясности
+                    this._removeCharacterWithPortal(key, entry);
                     continue;
                 }
             }
