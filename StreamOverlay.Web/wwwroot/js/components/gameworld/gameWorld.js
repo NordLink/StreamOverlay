@@ -123,14 +123,16 @@ class CombatSystem {
     // {number} now - текущее время
     // {number} worldWidth - ширина мира
     // {Function} onFightEnd - колбэк при завершении боя
+    // {Function} onAttack - НОВОЕ: колбэк при нанесении удара (для трансляции)
 
-    static processFight(key, entry, characters, config, walkSpeedPxPerFrame, delta, now, worldWidth, onFightEnd) {
+    static processFight(key, entry, characters, config, walkSpeedPxPerFrame, delta, now, worldWidth, onFightEnd, onAttack, onStateChange) {
         const physics = entry.physics;
         const renderer = entry.renderer;
         const target = characters.get(physics.fightTargetKey);
 
         // Если цели нет или она стала лузером – бой заканчивается
-        if (!target || target.physics.isLoser) {
+        if (!target || target.physics.isLoser || !characters.has(physics.fightTargetKey)) {
+            // Безопасно завершаем бой, даже если один участник исчез
             onFightEnd(key, physics.fightTargetKey);
             return;
         }
@@ -166,6 +168,9 @@ class CombatSystem {
                         // Ограничение границами мира
                         physics.colliderX = Math.max(0, Math.min(worldWidth - physics.colliderWidth, physics.colliderX));
                         target.physics.colliderX = Math.max(0, Math.min(worldWidth - target.physics.colliderWidth, target.physics.colliderX));
+                    }
+                    if (onStateChange) {
+                        onStateChange(key, 'fighting');
                     }
 
                     // Оба бойца могут начинать атаковать (первый удар получает тот, у кого true в _startFight)
@@ -203,6 +208,12 @@ class CombatSystem {
                         targetChar.physics.fightCanAttack = true;
                     }
                 }
+
+                // 🔥 ОТПРАВЛЯЕМ СОБЫТИЕ СМЕНЫ СОСТОЯНИЯ НА 'fighting'
+                if (onStateChange) {
+                    onStateChange(key, 'fighting');
+                  
+                }
                 return;
             } else {
                 physics.vx = distanceToTarget > 0 ? walkSpeedPxPerFrame : -walkSpeedPxPerFrame;
@@ -225,6 +236,9 @@ class CombatSystem {
                     const damageMs = config.MAX_LIFETIME * damagePercent;
                     currentTarget.physics.dieTime -= damageMs;
                     const damageValue = Math.round(damagePercent * 100);
+
+                    // НОВОЕ: вызов колбэка для трансляции удара
+                    if (onAttack) onAttack(key, physics.fightTargetKey, damageValue);
 
                     if (currentTarget.renderer.playHitEffect) currentTarget.renderer.playHitEffect();
                     currentTarget.renderer.showDamage(damageValue);
@@ -305,6 +319,9 @@ export class GameWorld {
         // Для предотвращения параллельного создания одного персонажа
         this.pendingCreations = new Map(); // key -> Promise
 
+        // НОВОЕ: канал для трансляции дуэлей на вторую страницу
+        this.duelChannel = new BroadcastChannel('duel_broadcast');
+
         this._animationLoop = this._animationLoop.bind(this);
         this._handleResize = this._handleResize.bind(this);
     }
@@ -323,26 +340,51 @@ export class GameWorld {
     }
 
     destroy() {
+        // Отменяем анимационный цикл
         if (this._animationId) {
             cancelAnimationFrame(this._animationId);
             this._animationId = null;
         }
         window.removeEventListener('resize', this._handleResize);
+
+        // Очищаем таймауты боев у всех персонажей
         for (let entry of this.characters.values()) {
-            if (entry.physics.fightTimeout) clearTimeout(entry.physics.fightTimeout);
+            if (entry.physics.fightTimeout) {
+                clearTimeout(entry.physics.fightTimeout);
+                entry.physics.fightTimeout = null;
+            }
             entry.renderer.destroy(true);
         }
         this.characters.clear();
+
+        // Удаляем лидерборд
         if (this.leaderboardElement) {
             this.leaderboardElement.remove();
             this.leaderboardElement = null;
         }
-     
+
+        // Уничтожаем эффект портала
         if (this.portalEffect && this.portalEffect.destroy) {
             this.portalEffect.destroy();
         }
+
+        // Сбрасываем флаги дуэли
         this.isDuelInProgress = false;
         this.currentDuelZone = null;
+
+        // 🔥 НОВОЕ: если дуэль активна – уведомляем вторую страницу о принудительном завершении
+        if (this.duelChannel && this.isDuelInProgress && this.currentDuelParticipants) {
+            this.duelChannel.postMessage({
+                type: 'duelAbort',
+                reason: 'gameworld_destroyed',
+                timestamp: Date.now()
+            });
+        }
+
+        // Закрываем канал трансляции дуэлей
+        if (this.duelChannel) {
+            this.duelChannel.close();
+        }
     }
 
     _createLeaderboardElement() {
@@ -806,6 +848,21 @@ export class GameWorld {
         // Ререндер
         const characterType = this.config.character;
         const RendererClass = this.characterRenderers.get(characterType) || this.characterRenderers.get('turtle');
+
+        // НОВОЕ: выбор цвета панциря для черепахи (чтобы синхронизировать с дуэльным экраном)
+        let turtleColor = null;
+        if (RendererClass === TurtleRenderer) {
+            // Используем тот же список цветов, что и в TurtleRenderer (можно вынести в константу)
+            const turtleColors = [
+                '#89af41', '#76a032', '#a3c35d', '#6b8e23', '#556b2f',
+                '#7cb342', '#558b2f', '#8bc34a', '#9e9d24', '#cddc39',
+                '#4caf50', '#2e7d32', '#81c784', '#aed581', '#dcedc8',
+                '#c5e1a5', '#f0f4c3', '#afb42b', '#827717', '#33691e',
+                '#1b5e20', '#004d40', '#00695c', '#26a69a', '#80cbc4'
+            ];
+            turtleColor = turtleColors[Math.floor(Math.random() * turtleColors.length)];
+        }
+
         const renderer = new RendererClass(this.world, {
             fullWidth: physics.fullWidth,
             fullHeight: physics.fullHeight,
@@ -814,6 +871,7 @@ export class GameWorld {
             colliderOffsetX: physics.colliderOffsetX,
             debugCollider: this.config.DEBUG_COLLIDER,
             color, nickname, message, emotes,
+            turtleColor  // НОВОЕ: передаём фиксированный цвет
         });
 
         // Добавляем в коллекцию и инициализируем
@@ -948,6 +1006,20 @@ export class GameWorld {
 
         const characterType = this.config.character;
         const RendererClass = this.characterRenderers.get(characterType) || this.characterRenderers.get('turtle');
+
+        // НОВОЕ: выбор цвета панциря для черепахи
+        let turtleColor = null;
+        if (RendererClass === TurtleRenderer) {
+            const turtleColors = [
+                '#89af41', '#76a032', '#a3c35d', '#6b8e23', '#556b2f',
+                '#7cb342', '#558b2f', '#8bc34a', '#9e9d24', '#cddc39',
+                '#4caf50', '#2e7d32', '#81c784', '#aed581', '#dcedc8',
+                '#c5e1a5', '#f0f4c3', '#afb42b', '#827717', '#33691e',
+                '#1b5e20', '#004d40', '#00695c', '#26a69a', '#80cbc4'
+            ];
+            turtleColor = turtleColors[Math.floor(Math.random() * turtleColors.length)];
+        }
+
         const renderer = new RendererClass(this.world, {
             fullWidth: physics.fullWidth,
             fullHeight: physics.fullHeight,
@@ -955,7 +1027,8 @@ export class GameWorld {
             colliderHeight: physics.colliderHeight,
             colliderOffsetX: physics.colliderOffsetX,
             debugCollider: this.config.DEBUG_COLLIDER,
-            color, nickname, message, emotes
+            color, nickname, message, emotes,
+            turtleColor
         });
 
         this.characters.set(key, { physics, renderer });
@@ -987,7 +1060,7 @@ export class GameWorld {
         if (worldWidth === 0) return;
 
         const worldCenter = worldWidth / 2;
-        const desiredCenterDistance = charA.physics.fullWidth * 0.8;
+        const desiredCenterDistance = charA.physics.fullWidth * 0.9;
         const halfDistance = desiredCenterDistance / 2;
 
         const centerA = charA.physics.colliderX + charA.physics.colliderWidth / 2;
@@ -1046,6 +1119,88 @@ export class GameWorld {
 
         setupFighter(leftChar, rightChar.physics.key, leftTargetX);
         setupFighter(rightChar, leftChar.physics.key, rightTargetX);
+
+
+
+        // отправляем событие начала дуэли на вторую страницу
+        this._sendDuelStart(keyA, keyB, leftChar, rightChar, worldWidth);
+        if (!leftChar.physics.fightMoveToTarget && !rightChar.physics.fightMoveToTarget) {
+            this._sendDuelStateChange(leftChar.physics.key, 'fighting');
+            this._sendDuelStateChange(rightChar.physics.key, 'fighting');
+        } else {
+            this._sendDuelStateChange(leftChar.physics.key, 'walking');
+            this._sendDuelStateChange(rightChar.physics.key, 'walking');
+        }
+    }
+
+    // отправка события начала дуэли
+    _sendDuelStart(attackerKey, defenderKey, leftChar, rightChar, worldWidth) {
+        const leftTargetXPercent = (leftChar.physics.fightTargetX / worldWidth) * 100;
+        const rightTargetXPercent = (rightChar.physics.fightTargetX / worldWidth) * 100;
+
+        const getCharData = (char, side, targetXPercent) => ({
+            key: char.physics.key,
+            nickname: char.physics.nickname,
+            color: char.renderer.options.color,
+            turtleColor: char.renderer.selectedTurtleColor || null,
+            side: side,
+            targetXPercent: targetXPercent,
+            fullWidthPx: char.physics.fullWidth,
+            colliderWidthPx: char.physics.colliderWidth,
+            colliderOffsetX: char.physics.colliderOffsetX,
+            isWinner: char.renderer._winnerFlag || false,
+        });
+
+        const left = getCharData(leftChar, 'left', leftTargetXPercent);
+        const right = getCharData(rightChar, 'right', rightTargetXPercent);
+
+        this.duelChannel.postMessage({
+            type: 'duelStart',
+            attackerKey: attackerKey,
+            defenderKey: defenderKey,
+            left: left,
+            right: right,
+            config: {
+                CHAR_SIZE: this.config.CHAR_SIZE,
+                COLLIDER_WIDTH_PERCENT: this.config.COLLIDER_WIDTH_PERCENT,
+                MAX_LIFETIME: this.config.MAX_LIFETIME,
+                TARGET_FPS: this.config.TARGET_FPS,
+                DUEL_ZONE_MARGIN_PERCENT: this.config.DUEL_ZONE_MARGIN_PERCENT,
+            },
+            timestamp: Date.now()
+        });
+    }
+
+    _sendDuelStateChange(fighterKey, state) {
+        this.duelChannel.postMessage({
+            type: 'duelStateChange',
+            fighterKey: fighterKey,
+            state: state,       // 'walking' или 'fighting'
+            timestamp: Date.now()
+        });
+    }
+
+    // НОВОЕ: отправка события удара
+    _sendDuelAttack(attackerKey, targetKey, damageValue) {
+        this.duelChannel.postMessage({
+            type: 'duelAttack',
+            attackerKey: attackerKey,
+            targetKey: targetKey,
+            damageValue: damageValue,
+            timestamp: Date.now()
+        });
+    }
+
+    // НОВОЕ: отправка события завершения дуэли
+    _sendDuelEnd(winnerKey, loserKey, winnerHealthPercent = 100, loserHealthPercent = 50) {
+        this.duelChannel.postMessage({
+            type: 'duelEnd',
+            winnerKey: winnerKey,
+            loserKey: loserKey,
+            winnerHealthPercent: winnerHealthPercent,
+            loserHealthPercent: loserHealthPercent,
+            timestamp: Date.now()
+        });
     }
 
     // Завершает дуэль. Победитель: 100% HP, получает класс winner. Проигравший: 50 % HP, получает класс loser на время равное 10 % от MAX_LIFETIME.
@@ -1101,6 +1256,9 @@ export class GameWorld {
         this.currentDuelParticipants = null;
         this.currentDuelZone = null;
 
+        // НОВОЕ: отправляем событие завершения
+        this._sendDuelEnd(winnerKey, loserKey, 100, 50);
+
         if (this.onDuelEndCallback && winner && loser) {
             this.onDuelEndCallback({
                 winnerKey: winner.physics.key,
@@ -1146,7 +1304,7 @@ export class GameWorld {
         if (worldWidth === 0) return;
 
         const worldCenter = worldWidth / 2;
-        const desiredCenterDistance = charA.physics.fullWidth * 0.8;
+        const desiredCenterDistance = charA.physics.fullWidth * 0.9;
         const halfDistance = desiredCenterDistance / 2;
 
         // Определяем левого и правого по сохранённому fightSide
@@ -1221,7 +1379,10 @@ export class GameWorld {
 
         await new Promise(resolve => setTimeout(resolve, 300));
 
-        if (physics.fightTimeout) clearTimeout(physics.fightTimeout);
+        if (physics.fightTimeout) {
+            clearTimeout(physics.fightTimeout);
+            physics.fightTimeout = null;
+        }
         renderer.destroy(true);
         this.characters.delete(key);
 
@@ -1321,7 +1482,9 @@ export class GameWorld {
                 CombatSystem.processFight(
                     key, entry, this.characters, this.config,
                     this.walkSpeedPxPerFrame, delta, now, worldWidth,
-                    (winnerKey, loserKey) => this._endFight(winnerKey, loserKey)
+                    (winnerKey, loserKey) => this._endFight(winnerKey, loserKey),
+                    (attackerKey, targetKey, damageValue) => this._sendDuelAttack(attackerKey, targetKey, damageValue), // НОВОЕ: колбэк удара
+                    (fighterKey, newState) => this._sendDuelStateChange(fighterKey, newState)
                 );
             } else {
                 AISystem.updateWandering(physics, this.walkSpeedPxPerFrame, this.config, delta, this.currentDuelZone);

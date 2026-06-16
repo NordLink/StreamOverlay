@@ -60,6 +60,7 @@ app.MapGet("/demo", () => Results.File("pages/demo.html", "text/html"));
 app.MapGet("/overlay", () => Results.File("pages/overlay.html", "text/html"));
 app.MapGet("/chat", () => Results.File("pages/chat.html", "text/html"));
 app.MapGet("/viewers", () => Results.File("pages/viewers.html", "text/html"));
+app.MapGet("/dueldisplay", () => Results.File("pages/duelDisplay.html", "text/html"));
 app.MapGet("/api/config", async (IComponentConfigService configService) =>
 {
     var json = await configService.GetConfigAsync();

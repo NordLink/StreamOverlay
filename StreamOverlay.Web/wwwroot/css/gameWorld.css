@@ -398,7 +398,7 @@
 }
 
     .winner::before {
-        content: "👑";
+        content: "🔥";
         position: absolute;
         bottom: 130%;
         left: 50%;

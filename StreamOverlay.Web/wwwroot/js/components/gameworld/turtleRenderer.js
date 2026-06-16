@@ -12,6 +12,13 @@ export default class TurtleRenderer extends BaseCharacterRenderer {
             '#c5e1a5', '#f0f4c3', '#afb42b', '#827717', '#33691e', // оливково-жёлтые
             '#1b5e20', '#004d40', '#00695c', '#26a69a', '#80cbc4'  // тёмно-зелёные и бирюза
         ];
+        // если передан конкретный цвет панциря – используем его, иначе случайный
+        this.selectedTurtleColor = options.turtleColor || this._getRandomTurtleColor();
+    }
+
+    // метод для получения случайного цвета из списка (используется, если цвет не передан)
+    _getRandomTurtleColor() {
+        return this.turtleColors[Math.floor(Math.random() * this.turtleColors.length)];
     }
 
     async _addSvgContent() {
@@ -35,8 +42,8 @@ export default class TurtleRenderer extends BaseCharacterRenderer {
         svgClone.style.display = 'block';
         this.container.appendChild(svgClone);
 
-        const bodyColor = this.turtleColors[Math.floor(Math.random() * this.turtleColors.length)];
+        // используем фиксированный цвет панциря
         this.container.style.setProperty('--mask-color', this.options.color);
-        this.container.style.setProperty('--turtle-color', bodyColor);
+        this.container.style.setProperty('--turtle-color', this.selectedTurtleColor);
     }
 }

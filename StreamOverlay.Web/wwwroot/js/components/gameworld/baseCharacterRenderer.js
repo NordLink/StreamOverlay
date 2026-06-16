@@ -18,7 +18,7 @@
         this._hitTimeout = null;
     }
 
-    init() {
+    async init() {
         this.container = document.createElement('div');
         this.container.className = 'character-container';
         this.container.style.position = 'absolute';
@@ -69,7 +69,7 @@
         this.bubbleEl.className = 'bubble';
         this.container.appendChild(this.bubbleEl);
 
-        this._addSvgContent();
+        await this._addSvgContent();
 
         this.world.appendChild(this.container);
         this.setState('idle');
@@ -275,7 +275,7 @@
     }
 
     // Метод для наследников
-    _addSvgContent() {
+    async _addSvgContent() {
         throw new Error('_addSvgContent must be implemented by subclass');
     }
 }

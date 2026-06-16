@@ -1,0 +1,531 @@
+﻿<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>Дуэль</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            user-select: none;
+        }
+
+        body {
+            background: transparent;
+            overflow: hidden;
+            font-family: Inter, Segoe UI, Arial, sans-serif;
+        }
+
+        #duel-world {
+            position: absolute;
+            top: 0;
+            left: 50%; /* Сдвигает левый край элемента на центр родителя */
+            transform: translateX(-50%); /* Сдвигает элемент влево на половину его собственной ширины */
+            height: 100%;
+            width: auto;
+            aspect-ratio: 3 / 2;
+            background: transparent;
+            overflow: visible;
+            contain: layout style;
+            container-type: inline-size;
+        }
+        .character-container {
+            position: absolute;
+            display: flex;
+            justify-content: center;
+            align-items: flex-end;
+            will-change: transform, opacity;
+            contain: layout style;
+            transform: translateZ(0);
+            z-index: 11;
+            opacity: 1;
+            /* transition не задаём глобально — им будет управлять JS при fadeIn */
+        }
+
+        .svg-char {
+            position: absolute;
+            bottom: 0;
+            overflow: visible !important;
+        }
+
+        /* ═══════════════════════════════════════════════════════════════════ */
+        /* UI-ЭЛЕМЕНТЫ ПЕРСОНАЖЕЙ */
+        /* ═══════════════════════════════════════════════════════════════════ */
+
+        .nickname,
+        .life-bar-container,
+        .bubble {
+            position: absolute;
+            left: 50%;
+            transform: translateX(-50%);
+            pointer-events: none;
+            will-change: transform, opacity;
+        }
+
+        /* ─────────────────────────────────────────────────────────────────── */
+        /* Никнейм */
+        /* ─────────────────────────────────────────────────────────────────── */
+
+        .nickname {
+            bottom: 90%;
+            margin-bottom: 0.8cqw;
+            font-size: 6cqw;
+            font-weight: 800;
+            white-space: nowrap;
+            text-shadow: 1px 1px 0 #000, -1px -1px 0 #000, 1px -1px 0 #000, -1px 1px 0 #000;
+            z-index: 10;
+        }
+
+        .character-container.winner .nickname {
+            bottom: 114%;
+        }
+
+        /* ─────────────────────────────────────────────────────────────────── */
+        /* Полоса здоровья */
+        /* ─────────────────────────────────────────────────────────────────── */
+
+        .life-bar-container {
+            bottom: 80%;
+            margin-bottom: 0.3cqw;
+            width: 22cqw;
+            height: 2.2cqw;
+            background: rgba(0, 0, 0, 0.5);
+            border: 0.2cqw solid #000;
+            border-radius: 3px;
+            overflow: hidden;
+            contain: paint;
+        }
+
+        .character-container.winner .life-bar-container {
+            bottom: 105%;
+        }
+
+        .life-bar-fill {
+            width: 100%;
+            height: 100%;
+            background: #2ecc71;
+            transition: width 0.1s linear, background-color 0.5s;
+            transform-origin: left;
+        }
+        @keyframes float-breathing {
+            0%, 100% {
+                transform: translateY(0);
+            }
+
+            50% {
+                transform: translateY(-10px);
+            }
+        }
+
+        @keyframes blink-animation {
+            0%, 95%, 100% {
+                opacity: 0;
+            }
+
+            97%, 99% {
+                opacity: 1;
+            }
+        }
+
+        @keyframes walk-swing {
+            0%, 100% {
+                transform: rotate(-18deg);
+            }
+
+            50% {
+                transform: rotate(18deg);
+            }
+        }
+
+        @keyframes weapon-attack {
+            0% {
+                transform: rotate(0deg);
+            }
+
+            30% {
+                transform: rotate(-150deg);
+            }
+
+            45% {
+                transform: rotate(0deg);
+            }
+
+            100% {
+                transform: rotate(0deg);
+            }
+        }
+
+        @keyframes crown-float {
+            from {
+                transform: translateX(-50%) translateY(0);
+            }
+
+            to {
+                transform: translateX(-50%) translateY(-5px);
+            }
+        }
+
+        @keyframes damage-float {
+            0% {
+                opacity: 1;
+                transform: translateX(-50%) translateY(0);
+            }
+
+            100% {
+                opacity: 0;
+                transform: translateX(-50%) translateY(-50px);
+            }
+        }
+
+        @keyframes pulse {
+            0%, 100% {
+                opacity: 1;
+            }
+
+            50% {
+                opacity: 0.5;
+            }
+        }
+
+        @keyframes ticker-scroll {
+            0% {
+                transform: translateX(0);
+            }
+
+            100% {
+                transform: translateX(-100%);
+            }
+        }
+
+        /* ═══════════════════════════════════════════════════════════════════ */
+        /* СОСТОЯНИЯ ПЕРСОНАЖЕЙ */
+        /* ═══════════════════════════════════════════════════════════════════ */
+
+        .idle #Shell,
+        .idle #Head,
+        .idle #Belly,
+        .idle #HandLeft,
+        .idle #HandRight,
+        .idle #Eyelids,
+        .fighting #Shell,
+        .fighting #Head,
+        .fighting #Belly,
+        .fighting #HandLeft,
+        .fighting #HandRight,
+        .fighting #Eyelids {
+            animation: float-breathing 1.2s ease-in-out infinite;
+            will-change: transform;
+        }
+
+        #Eyelids {
+            opacity: 0;
+            animation: blink-animation 4s infinite;
+            will-change: opacity;
+        }
+
+        .walking #LegLeft,
+        .walking #LegRight,
+        .walking #HandLeft {
+            transform-box: fill-box;
+            transform-origin: 50% 0%;
+            animation: walk-swing 0.35s ease-in-out infinite;
+            will-change: transform;
+        }
+
+        .walking #HandRight {
+            transform-box: fill-box;
+            transform-origin: 0% 50%;
+            animation: walk-swing 0.35s ease-in-out infinite;
+            will-change: transform;
+        }
+
+        .walking #HandLeft,
+        .walking #LegRight {
+            animation-delay: -0.175s;
+        }
+
+        .jumping .svg-char {
+        }
+
+        .dead {
+            opacity: 0.5;
+            filter: grayscale(100%);
+        }
+
+        /* ═══════════════════════════════════════════════════════════════════ */
+        /* БОЕВАЯ СИСТЕМА */
+        /* ═══════════════════════════════════════════════════════════════════ */
+
+        #Weapon {
+            opacity: 0;
+            will-change: opacity;
+        }
+
+        .inCombat #Weapon {
+            opacity: 1;
+        }
+
+        .attacking #HandRight {
+            transform-box: fill-box;
+            transform-origin: 0% 50%;
+            animation: weapon-attack 0.6s ease-in-out 1;
+            will-change: transform;
+        }
+
+        .character-container.hit .svg-char {
+            filter: brightness(1.3);
+            animation: none;
+        }
+
+        /* ═══════════════════════════════════════════════════════════════════ */
+        /* ПОБЕДИТЕЛЬ / ПРОИГРАВШИЙ */
+        /* ═══════════════════════════════════════════════════════════════════ */
+
+        .winner {
+            position: relative;
+            will-change: filter;
+        }
+
+            .winner::before {
+                content: "🔥";
+                position: absolute;
+                bottom: 135%;
+                left: 50%;
+                transform: translateX(-50%);
+                font-size: 6cqw;
+                animation: crown-float 0.5s infinite alternate;
+                will-change: transform;
+            }
+
+        .loser {
+            position: relative;
+            will-change: filter;
+        }
+
+            .loser::before {
+                content: "💔";
+                position: absolute;
+                bottom: 115%;
+                left: 50%;
+                transform: translateX(-50%);
+                font-size: 6cqw;
+                animation: pulse 2s infinite;
+                will-change: transform;
+            }
+
+        /* ═══════════════════════════════════════════════════════════════════ */
+        /* ВСПЛЫВАЮЩИЕ ЧИСЛА */
+        /* ═══════════════════════════════════════════════════════════════════ */
+
+        .float-number {
+            position: absolute;
+            left: 50%;
+            top: 0;
+            transform: translateX(-50%);
+            font-size: 8cqw;
+            font-weight: bold;
+            white-space: nowrap;
+            text-shadow: 1px 1px 0 rgba(0, 0, 0, 0.5);
+            animation: damage-float 1s ease-out forwards;
+            pointer-events: none;
+            z-index: 100;
+            will-change: transform, opacity;
+        }
+
+            .float-number.damage {
+                color: #ff0000;
+            }
+
+            .float-number.heal {
+                color: #55ff55;
+            }
+
+        /* ═══════════════════════════════════════════════════════════════════ */
+        /* ЛИДЕРБОРД */
+        /* ═══════════════════════════════════════════════════════════════════ */
+
+        .game-leaderboard {
+            position: absolute;
+            top: 8%;
+            left: 28.5%;
+            padding: 0.6cqw 0.6cqw;
+            font-family: 'Segoe UI', 'Courier New', monospace;
+            font-size: 0.8cqw;
+            font-weight: normal;
+            z-index: 0;
+            width: 17.5%;
+            height: 80%;
+            text-align: left;
+            contain: layout;
+        }
+
+        .leaderboard-header {
+            color: #ffd966;
+            font-size: 0.6cqw;
+            font-weight: bold;
+            text-align: center;
+            padding-bottom: 0.1cqw;
+            margin-bottom: 0cqw;
+        }
+
+        .leaderboard-table {
+            margin-top: 8%;
+            width: 100%;
+        }
+
+        .table-header, .table-row {
+            display: flex;
+            justify-content: space-between;
+            padding: 0.1cqw 0;
+            border-bottom: 0.1cqw solid rgba(255, 170, 51, 0.2);
+        }
+
+        .table-header {
+            font-weight: bold;
+            color: #999;
+            border-bottom: 0.1cqw solid #999;
+            margin-bottom: 0.2cqw;
+        }
+
+        .col-place {
+            width: 2cqw;
+            text-align: center;
+        }
+
+        .col-name {
+            flex: 10cqw;
+            text-align: left;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+            font-weight: bold;
+        }
+
+        .col-wins, .col-losses, .col-total, .col-diff {
+            min-width: 2cqw;
+            text-align: center;
+        }
+
+        .positive {
+            color: #88ff88;
+        }
+
+        .negative {
+            color: #ff8888;
+        }
+
+        .loading, .error, .empty {
+            text-align: center;
+            color: #cccccc;
+            font-style: italic;
+            padding: 8px 0;
+        }
+
+        /* ═══════════════════════════════════════════════════════════════════ */
+        /* ТИКЕР */
+        /* ═══════════════════════════════════════════════════════════════════ */
+
+        .ticker-container {
+            position: absolute;
+            overflow: hidden;
+            white-space: nowrap;
+            top: 14%;
+            left: 0.5cqw;
+            right: 0.5cqw;
+            font-weight: bold;
+            width: 95%;
+            contain: paint;
+        }
+
+        .ticker-text {
+            display: inline-block;
+            animation: ticker-scroll 20s linear infinite;
+            padding-left: 100%;
+            will-change: transform;
+        }
+
+        /* ═══════════════════════════════════════════════════════════════════ */
+        /* БИНТЫ / ШЛЕМЫ */
+        /* ═══════════════════════════════════════════════════════════════════ */
+
+        .character-container .bandage {
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.2s ease;
+        }
+
+        .character-container.loser .bandage {
+            opacity: 1;
+        }
+
+        .character-container .helmet {
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.2s ease;
+        }
+
+        .character-container.winner .helmet {
+            opacity: 1;
+        }
+
+        .character-container.winner .mask-node {
+            opacity: 0;
+        }
+
+        .portal-particle {
+            animation: floatParticle 2.5s infinite alternate ease-in-out;
+        }
+
+        @keyframes floatParticle {
+            0% {
+                transform: translate(0px, 0px) scale(1);
+                opacity: 0.4;
+            }
+
+            100% {
+                transform: translate(5px, -7px) scale(1.3);
+                opacity: 1;
+            }
+        }
+
+
+
+        .victory-overlay {
+            position: absolute;
+            top: 0;
+            left: 50%;
+            transform: translateX(-50%);
+            font-size: 6cqw; /* увеличьте по желанию */
+            font-weight: bold;
+            font-family: 'Arial Black', sans-serif;
+            text-shadow: 1px 1px 0 #000, -1px -1px 0 #000, 1px -1px 0 #000, -1px 1px 0 #000;
+            white-space: nowrap;
+            pointer-events: none;
+            z-index: 2000;
+            text-align: center;
+            color: white;
+            animation: victoryPulse 3s ease-in-out infinite;
+        }
+
+        @keyframes victoryPulse {
+            0% {
+                transform: translateX(-50%) scale(1);
+            }
+
+            50% {
+                transform: translateX(-50%) scale(1.08);
+            }
+
+            100% {
+                transform: translateX(-50%) scale(1);
+            }
+        }
+    </style>
+    <script type="module" src="/js/orchestrates/duelDisplayPage.js"></script>
+</head>
+<body>
+    <div id="duel-world"></div>
+</body>
+</html>
