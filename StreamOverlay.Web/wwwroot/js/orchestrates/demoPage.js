@@ -6,12 +6,12 @@ import { GameWorld } from '../components/gameworld/gameWorld.js';
 
 (() => {
 
-    const header = new ChannelHeader("channel-name", { staticName: "OneGoldShow" });
+    // const header = new ChannelHeader("channel-name", { staticName: "OneGoldShow" });
     const stats = new ViewerStats("viewers-info");
     const chat = new Chat("chat", {
         maxLines: 11,
-        showTime: true,
-        showPlatformTag: true,
+        showTime: false,
+        showPlatformTag: false,
         showPlatformColor: true
     });
 
@@ -65,7 +65,7 @@ import { GameWorld } from '../components/gameworld/gameWorld.js';
     };
     streamHub.onStatusChangeCallback = (status) => logStatus(status);
 
-    header.render();
+    // header.render();
     stats.render();
     streamHub.start();
 })();

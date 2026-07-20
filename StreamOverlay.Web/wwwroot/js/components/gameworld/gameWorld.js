@@ -30,6 +30,8 @@ class PhysicsSystem {
         }
 
         physics.isGrounded = false;
+        physics.canJump = true;
+
 
         // коллизии с платформами (только при движении вниз)
         if (physics.vy > 0) {
@@ -42,6 +44,8 @@ class PhysicsSystem {
                     physics.colliderY = p.top - physics.colliderHeight;
                     physics.vy = 0;
                     physics.isGrounded = true;
+
+                    physics.canJump = p.allowJump !== false;
 
                     if (!physics.isFighting) {
                         physics.state = physics.vx === 0 ? 'idle' : 'walking';
@@ -56,6 +60,7 @@ class PhysicsSystem {
             physics.colliderY = worldHeight - physics.colliderHeight;
             physics.vy = 0;
             physics.isGrounded = true;
+            physics.canJump = true;
             if (!physics.isFighting) {
                 physics.state = physics.vx === 0 ? 'idle' : 'walking';
             }
@@ -99,9 +104,16 @@ class AISystem {
             if (rand < 0.3) physics.vx = -walkSpeedPxPerFrame;
             else if (rand < 0.6) physics.vx = walkSpeedPxPerFrame;
             else if (rand < 0.8) {
-                physics.vy = config.JUMP_POWER;
-                physics.isGrounded = false;
-                physics.state = 'jumping';
+                // Проверяем флаг canJump перед инициацией прыжка
+                if (physics.canJump) {
+                    physics.vy = config.JUMP_POWER;
+                    physics.isGrounded = false;
+                    physics.state = 'jumping';
+                } else {
+                    // Если прыгать нельзя, персонаж просто стоит
+                    physics.vx = 0;
+                    physics.state = 'idle';
+                }
             } else {
                 physics.vx = 0;
                 physics.state = 'idle';
@@ -276,15 +288,15 @@ export class GameWorld {
         const defaultConfig = {
             GRAVITY: 0.4,
             JUMP_POWER: -8,
-            WALK_SPEED_PERCENT_PER_SECOND: 5,
-            CHAR_SIZE: 6, // размер персонажа в % от ширины мира
+            WALK_SPEED_PERCENT_PER_SECOND: 4,
+            CHAR_SIZE: 5, // размер персонажа в % от ширины мира
             COLLIDER_WIDTH_PERCENT: 50, // ширина коллайдера в % от размера персонажа
             DUEL_ZONE_MARGIN_PERCENT: 5, // ширина дуэль зоны
             DEBUG_COLLIDER: false,
             WORLD_HEIGHT: 400,
             MAX_LIFETIME: 900000,
             MAX_CHARACTERS: 20,
-            MAX_MESSAGE_LENGTH: 160,
+            MAX_MESSAGE_LENGTH: 110,
             TARGET_FPS: 60,
             character: 'turtle'
         };
@@ -293,13 +305,14 @@ export class GameWorld {
         this.onDuelEndCallback = onDuelEndCallback;
 
         this.platformSettings = [
-            { left: 87, top: 77.5, width: 13, height: 20 },
-            { left: 60.5, top: 62, width: 2.5, height: 20 },
-            { left: 49.5, top: 63, width: 6.5, height: 20 },
-            { left: 49.3, top: 81.25, width: 7, height: 20 },
-            { left: 18.5, top: 63, width: 6.5, height: 20 },
-            { left: 18.3, top: 81.25, width: 7, height: 20 },
-            { left: 12, top: 62, width: 2.5, height: 20 }
+            { left: 1.8, top: 59.5, width: 2.9, height: 20, allowJump: false }, // урна слева
+            { left: 7, top: 58, width: 6.4, height: 20, allowJump: false }, // спинка лавочки слева
+            { left: 6.8, top: 77, width: 6.8, height: 20 }, // лавочка слева
+            { left: 29.3, top: 58, width: 6.4, height: 20, allowJump: false }, // спинка лавочки справа
+            { left: 29.1, top: 77, width: 6.8, height: 20 }, // лавочка справа
+            { left: 38.05, top: 59.5, width: 2.9, height: 20, allowJump: false }, // урна справа
+            { left: 76.8, top: 75.5, width: 6.5, height: 20 }, // коробки
+            { left: 69.8, top: 49.5, width: 25.5, height: 20 } // дом
         ];
 
         this.walkSpeedPxPerFrame = 0;
@@ -330,8 +343,37 @@ export class GameWorld {
         this.characterRenderers.set(type, rendererClass);
     }
 
+    _addDecoration(src, alt, left, top, width, height, zIndex = 0, opacity = 1) {
+        const img = document.createElement('img');
+        img.src = src;
+        img.alt = alt;
+        img.style.position = 'absolute';
+        img.style.left = left;
+        img.style.top = top;
+        img.style.width = width;
+        img.style.height = height;
+        img.style.pointerEvents = 'none';
+        img.style.zIndex = zIndex;
+        img.style.opacity = opacity;
+        this.world.appendChild(img);
+        return img;
+    }
+
+
     init() {
+
         this._createPlatforms(this.platformSettings);
+
+        this._addDecoration(
+            '/assets/img/signboard.webp', 'Вывеска',
+            '1.5%', '28%', 'auto', '30%', 0
+        );
+        this._addDecoration(
+            '/assets/img/smoke.webp', 'Дым',
+            '68.7%', '50%', '12%', 'auto', 999, 0.4
+        );
+
+
         this._updateSpeedScale();
         window.addEventListener('resize', this._handleResize);
         this._createLeaderboardElement();
@@ -418,14 +460,14 @@ export class GameWorld {
         if (!this.leaderboardElement) return;
         let html = `<div class="leaderboard-header">🏆 ЛУЧШИЕ ГЛАДИАТОРЫ</div>`;
         html += `<div class="leaderboard-table">
-            <div class="table-header">
-                <span class="col-place">#</span>
-                <span class="col-name">Игрок</span>
-                <span class="col-wins">В</span>
-                <span class="col-losses">П</span>
-                <span class="col-total">И</span>
-                <span class="col-diff">%</span>
-            </div>`;
+                    <div class="table-header">
+                    <span class="col-place">#</span>
+                    <span class="col-name">Игрок</span>
+                    <span class="col-total">И</span>
+                    <span class="col-wins">В</span>
+                    <span class="col-losses">П</span>
+                    <span class="col-diff">ВР</span>
+                </div>`;
         if (data.topWins && data.topWins.length) {
             data.topWins.forEach((entry, index) => {
                 const displayName = this._getDisplayName(entry.name);
@@ -433,11 +475,11 @@ export class GameWorld {
                 const nameStyle = entry.color ? `style="color: ${entry.color}"` : '';
                 html += `<div class="table-row">
                     <span class="col-place">${index + 1}</span>
-                    <span class="col-name" ${nameStyle} title="${this._escapeHtml(displayName)}">${this._escapeHtml(displayName)}</span>
-                    <span class="col-wins">${entry.wins}</span>
-                    <span class="col-losses">${entry.losses}</span>
-                    <span class="col-total">${entry.totalDuels}</span>
-                    <span class="col-diff ${winrateClass}">${entry.winRate}</span>
+                <span class="col-name" ${nameStyle} title="${this._escapeHtml(displayName)}">${this._escapeHtml(displayName)}</span>
+                <span class="col-total">${entry.totalDuels}</span> 
+                <span class="col-wins">${entry.wins}</span>  
+                <span class="col-losses">${entry.losses}</span>
+                <span class="col-diff ${winrateClass}">${entry.winRate}</span>
                 </div>`;
             });
         } else {
@@ -503,7 +545,8 @@ export class GameWorld {
             left: (p.leftPercent / 100) * worldWidth,
             right: ((p.leftPercent + p.widthPercent) / 100) * worldWidth,
             top: (p.topPercent / 100) * worldHeight,
-            bottom: (p.topPercent / 100) * worldHeight + p.height
+            bottom: (p.topPercent / 100) * worldHeight + p.height,
+            allowJump: p.allowJump
         }));
     }
 
@@ -520,7 +563,8 @@ export class GameWorld {
                 leftPercent: p.left,
                 topPercent: p.top,
                 widthPercent: p.width,
-                height: p.height
+                height: p.height,
+                allowJump: p.allowJump !== undefined ? p.allowJump : true
             });
         });
     }
@@ -1284,6 +1328,8 @@ export class GameWorld {
         const containerX = physics.colliderX - physics.colliderOffsetX;
         const containerY = physics.colliderY;
         renderer.setPosition(containerX, containerY);
+        const zIndex = 100 + Math.floor(containerY);
+        renderer.setZIndex(zIndex);
     }
 
     _updateColliderBlockStyle(renderer, physics) {

@@ -85,7 +85,9 @@ public class TwitchChatService : BackgroundService
                     Message: e.ChatMessage.Message, 
                     Color: e.ChatMessage.HexColor, 
                     SendTime: formattedDate,
-                    Emotes: emoteList), 
+                    Emotes: emoteList,
+                    IsHighlighted: e.ChatMessage.IsHighlighted
+                    ), 
                   stoppingToken);
             }
             catch (Exception ex)

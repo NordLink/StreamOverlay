@@ -22,6 +22,7 @@ public record OverlayChatMessageDto(
     string Message,
     string? Color,
     string? SendTime = null,
-    List<OverlayEmoteDto>? Emotes = null
+    List<OverlayEmoteDto>? Emotes = null,
+    bool? IsHighlighted = false
  );
 

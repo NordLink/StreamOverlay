@@ -163,6 +163,12 @@
         }
     }
 
+    setZIndex(zIndex) {
+        if (this.container) {
+            this.container.style.zIndex = zIndex;
+        }
+    }
+
     updateColliderDimensions(width, height, offsetX) {
         if (this.colliderBlock) {
             this.colliderBlock.style.width = `${width}px`;

@@ -9,7 +9,7 @@ import { GameWorld } from '../components/gameworld/gameWorld.js';
     const configService = new ConfigService();
     const config = await configService.getConfigSafe({});
 
-    const header = new ChannelHeader("channel-name", config.channelHeader);
+    // const header = new ChannelHeader("channel-name", config.channelHeader);
 
     const streamHub = new ConnectionService("/chat-hub");
 
@@ -44,6 +44,6 @@ import { GameWorld } from '../components/gameworld/gameWorld.js';
         gameWorld.spawnFromMessage(payload);
     };
 
-    header.render();
+    // header.render();
     await streamHub.start();
 })();

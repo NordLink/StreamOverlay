@@ -16,16 +16,93 @@ body {
     color: var(--text);
 }
 
+.viewers-info-wrapper {
+    /* ЗАДАЕТСЯ НА СТРАНИЦЕ В HTML*/
+}
+
 #viewers-info {
-    width: 100%;
     display: flex;
     justify-content: space-around;
-    font-size: 24px;
-    font-weight: bold;
-    padding-bottom: 10px;
+    width: 100%;
+    aspect-ratio: 16 / 1.6;
+    box-sizing: border-box;
+    background: rgba(0, 0, 0, 0.8);
+    display: flex;
+    border-radius: 5px;
+    font-family: 'Montserrat', 'Inter', sans-serif;
+    white-space: nowrap;
+    container-type: inline-size;
+    container-name: viewers-wrapper;
+    z-index: 999;
 }
 
 .info-block {
-    text-align: center;
-    text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.5);
+    display: flex;
+    align-items: center;
+    font-size: 4cqw;
+    color: #ffffff;
+    flex: 1;
+    justify-content: center;
+}
+
+    .info-block::before {
+        content: '';
+        display: inline-block;
+        width: 2cqw;
+        height: 2cqw;
+        border-radius: 50%;
+        margin-right: 2cqw;
+        flex-shrink: 0;
+        box-shadow: 0 0 1.5cqw currentColor;
+    }
+
+    .info-block:first-child::before {
+        background-color: #a970ff;
+        color: #a970ff;
+    }
+
+    .info-block:nth-child(2)::before {
+        background-color: #0077ff;
+        color: #0077ff;
+    }
+
+    .info-block:last-child::before {
+        background-color: #00e676;
+        color: #00e676;
+        animation: pulseGlow 2.5s infinite ease-in-out;
+    }
+
+
+.label {
+    font-weight: 500;
+    color: #cbd5e1;
+    margin-right: 1.5cqw;
+    letter-spacing: 0.05cqw;
+}
+
+.value {
+    display: inline-block;
+    font-size: 4.5cqw;
+    font-weight: 700;
+    color: #ffffff;
+    text-align: left;
+    font-variant-numeric: tabular-nums;
+    font-family: 'Inter', sans-serif;
+}
+
+@keyframes pulseGlow {
+    0% {
+        transform: scale(1);
+        box-shadow: 0 0 1cqw rgba(0, 230, 118, 0.6);
+    }
+
+    50% {
+        transform: scale(1.1);
+        box-shadow: 0 0 2.5cqw rgba(0, 230, 118, 1);
+    }
+
+    100% {
+        transform: scale(1);
+        box-shadow: 0 0 1cqw rgba(0, 230, 118, 0.6);
+    }
 }

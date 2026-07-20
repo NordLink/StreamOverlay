@@ -6,7 +6,7 @@
 
 #world {
     position: absolute;
-    bottom: 4.2%;
+    bottom: 6%;
     left: 0;
     width: 100%;
     height: auto;
@@ -21,8 +21,8 @@
 
 .platform {
     position: absolute;
-    /* Платформы визуально скрыты, но физически присутствуют */
     contain: layout;
+    /*    background: #ff0;*/
 }
 
 /* ═══════════════════════════════════════════════════════════════════ */
@@ -39,9 +39,8 @@
     transform: translateZ(0);
     z-index: 11;
     opacity: 1;
-    /* transition не задаём глобально — им будет управлять JS при fadeIn */
+    /* transition  управляет JS при fadeIn */
 }
-   
 
 .character-collider {
     background: #ff0;
@@ -120,59 +119,109 @@
 /* ─────────────────────────────────────────────────────────────────── */
 
 .bubble {
-    bottom: 80%;
-    margin-bottom: 1.8cqw;
+    position: absolute;
+    bottom: 50%;
+    margin-bottom: 2cqw;
     min-width: 40px;
     max-width: 30.6cqw;
     width: max-content;
-    padding: 0.3cqw 0.6cqw;
-    font-family: 'Lexie Readable', 'Comic Neue', 'Comic Sans MS', cursive;
-    font-size: 0.8cqw;
-    font-weight: 800;
+    padding: 0.5em 0.8em;
+    font-size: 0.65cqw;
+    font-weight: 900;
     text-transform: uppercase;
-    letter-spacing: 0.02em;
-    background: #fff9e8;
-    background: linear-gradient(145deg, #ffffff 0%, #fff3df 100%);
-    color: #222222;
-    border: 2px solid #111111;
-    border-radius: 28px 20px 30px 20px;
-    box-shadow: 5px 5px 0px rgba(0, 0, 0, 0.2), 0 4px 12px rgba(0, 0, 0, 0.1);
+    letter-spacing: 0.04em;
+    background: #ffffff;
+    background: linear-gradient(135deg, #ffffff 0%, #fff6e5 100%);
+    color: #111111;
+    border: 3px solid #111111;
+    border-radius: 30px 20px 35px 25px;
     text-align: left;
     transition: opacity 0.5s ease;
     z-index: 20;
+    filter: drop-shadow(2px 2px 0px #111111);
+    overflow-wrap: anywhere;
 }
 
     .bubble::after {
         content: '';
         position: absolute;
-        bottom: -0.8cqw;
+        bottom: -1.1em;
         left: 50%;
-        transform: translateX(-50%) rotate(0deg);
+        transform: translateX(-50%);
         width: 0;
         height: 0;
-        border-left: 0.6cqw solid transparent;
-        border-right: 0.6cqw solid transparent;
-        border-top: 0.8cqw solid #111111;
-        filter: drop-shadow(0 2px 0 rgba(0,0,0,0.1));
+        border-left: 0.6em solid transparent;
+        border-right: 0.6em solid transparent;
+        border-top: 1em solid #111111;
+        z-index: -1;
     }
 
     .bubble::before {
         content: '';
         position: absolute;
-        bottom: -0.4cqw;
+        bottom: -0.6em;
         left: 50%;
         transform: translateX(-50%);
         width: 0;
         height: 0;
-        border-left: 0.5cqw solid transparent;
-        border-right: 0.5cqw solid transparent;
-        border-top: 0.6cqw solid #fff9e8;
+        border-left: 0.45em solid transparent;
+        border-right: 0.45em solid transparent;
+        border-top: 0.85em solid #fff6e5;
         z-index: 1;
     }
 
 .character-container.winner .bubble {
     bottom: 100%;
 }
+
+/* ─────────────────────────────────────────────────────────────────── */
+/* Типы сообщений   */
+/* ─────────────────────────────────────────────────────────────────── */
+
+/* Информация */
+.bubble-info {
+    background: linear-gradient(145deg, #e2f0ff, #c8e2ff);
+    border-color: #1f6392;
+    filter: drop-shadow(2px 2px 0px #1f6392);
+}
+
+    .bubble-info::after {
+        border-top-color: #1f6392; 
+    }
+
+    .bubble-info::before {
+        border-top-color: #e2f0ff; 
+    }
+
+/* Предупреждение */
+.bubble-warning {
+    background: linear-gradient(145deg, #fff0db, #ffe0b5);
+    border-color: #b45f1b;
+    filter: drop-shadow(2px 2px 0px #b45f1b);
+}
+
+    .bubble-warning::after {
+        border-top-color: #b45f1b;
+    }
+
+    .bubble-warning::before {
+        border-top-color: #fff0db;
+    }
+
+/* Ошибка */
+.bubble-error {
+    background: linear-gradient(145deg, #ffe6e5, #ffcecc);
+    border-color: #a1301f;
+    filter: drop-shadow(4px 2px 0px #a1301f);
+}
+
+    .bubble-error::after {
+        border-top-color: #a1301f;
+    }
+
+    .bubble-error::before {
+        border-top-color: #ffe6e5;
+    }
 
 /* ─────────────────────────────────────────────────────────────────── */
 /* Типы сообщений */
@@ -186,6 +235,7 @@
     .bubble-info::after {
         border-top: 0.8cqw solid #1f6392;
     }
+
     .bubble-info::before {
         border-top: 0.6cqw solid #e2f0ff;
     }
@@ -198,6 +248,7 @@
     .bubble-warning::after {
         border-top-color: #b45f1b;
     }
+
     .bubble-warning::before {
         border-top: 0.6cqw solid #fff0db;
     }
@@ -210,6 +261,7 @@
     .bubble-error::after {
         border-top-color: #a1301f;
     }
+
     .bubble-error::before {
         border-top: 0.6cqw solid #ffe6e5;
     }
@@ -400,7 +452,7 @@
     .winner::before {
         content: "🔥";
         position: absolute;
-        bottom: 130%;
+        bottom: 140%;
         left: 50%;
         transform: translateX(-50%);
         font-size: 1cqw;
@@ -451,86 +503,6 @@
         color: #55ff55;
     }
 
-/* ═══════════════════════════════════════════════════════════════════ */
-/* ЛИДЕРБОРД */
-/* ═══════════════════════════════════════════════════════════════════ */
-
-.game-leaderboard {
-    position: absolute;
-    top: 8%;
-    left: 28.5%;
-    padding: 0.6cqw 0.6cqw;
-    font-family: 'Segoe UI', 'Courier New', monospace;
-    font-size: 0.8cqw;
-    font-weight: normal;
-    z-index: 0;
-    width: 17.5%;
-    height: 80%;
-    text-align: left;
-    contain: layout;
-}
-
-.leaderboard-header {
-    color: #ffd966;
-    font-size: 0.6cqw;
-    font-weight: bold;
-    text-align: center;
-    padding-bottom: 0.1cqw;
-    margin-bottom: 0cqw;
-}
-
-.leaderboard-table {
-    margin-top: 8%;
-    width: 100%;
-}
-
-.table-header, .table-row {
-    display: flex;
-    justify-content: space-between;
-    padding: 0.1cqw 0;
-    border-bottom: 0.1cqw solid rgba(255, 170, 51, 0.2);
-}
-
-.table-header {
-    font-weight: bold;
-    color: #999;
-    border-bottom: 0.1cqw solid #999;
-    margin-bottom: 0.2cqw;
-}
-
-.col-place {
-    width: 2cqw;
-    text-align: center;
-}
-
-.col-name {
-    flex: 10cqw;
-    text-align: left;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-    font-weight: bold;
-}
-
-.col-wins, .col-losses, .col-total, .col-diff {
-    min-width: 2cqw;
-    text-align: center;
-}
-
-.positive {
-    color: #88ff88;
-}
-
-.negative {
-    color: #ff8888;
-}
-
-.loading, .error, .empty {
-    text-align: center;
-    color: #cccccc;
-    font-style: italic;
-    padding: 8px 0;
-}
 
 /* ═══════════════════════════════════════════════════════════════════ */
 /* ТИКЕР */
@@ -582,6 +554,7 @@
 .character-container.winner .mask-node {
     opacity: 0;
 }
+
 .portal-particle {
     animation: floatParticle 2.5s infinite alternate ease-in-out;
 }
