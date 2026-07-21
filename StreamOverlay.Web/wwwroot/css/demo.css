@@ -188,8 +188,8 @@ body {
 
 .viewers-info-wrapper {
     position: absolute;
-    bottom: 1cqw;
-    right: 1cqw;
+    bottom: 15.4cqw;
+    left:23.4cqw;
     width: 20%;
     height: auto;
 }

@@ -9,9 +9,10 @@ import PortalEffect from './portalEffect.js';
 class PhysicsSystem {
     // Применяет гравитацию, обновляет позицию, обрабатывает столкновения.
     // Добавлен параметр timeScale для независимости от FPS
-    static applyGravityAndMovement(physics, platforms, worldWidth, worldHeight, config, timeScale = 1) {
-        // Умножаем гравитацию на timeScale
-        physics.vy += config.GRAVITY * timeScale;
+    // Третий параметр теперь scaledGravity, а не весь config
+    static applyGravityAndMovement(physics, platforms, worldWidth, worldHeight, scaledGravity, timeScale = 1) {
+        // Умножаем гравитацию на timeScale (используем переданное масштабированное значение)
+        physics.vy += scaledGravity * timeScale;
 
         const prevY = physics.colliderY;
 
@@ -31,7 +32,6 @@ class PhysicsSystem {
 
         physics.isGrounded = false;
         physics.canJump = true;
-
 
         // коллизии с платформами (только при движении вниз)
         if (physics.vy > 0) {
@@ -73,7 +73,8 @@ class AISystem {
 
     // Обновляет таймер действия и меняет направление/прыжок случайным образом.
     // delta - время с прошлого кадра
-    static updateWandering(physics, walkSpeedPxPerFrame, config, delta, duelZone) {
+    // Добавлен параметр scaledJumpPower
+    static updateWandering(physics, walkSpeedPxPerFrame, scaledJumpPower, config, delta, duelZone) {
         // Если есть активная дуэль и персонаж не в бою, то обрабатываем избегание зоны
         if (duelZone && !physics.isFighting) {
             const charLeft = physics.colliderX;
@@ -106,7 +107,8 @@ class AISystem {
             else if (rand < 0.8) {
                 // Проверяем флаг canJump перед инициацией прыжка
                 if (physics.canJump) {
-                    physics.vy = config.JUMP_POWER;
+                    // ИСПОЛЬЗУЕМ МАСШТАБИРОВАННОЕ ЗНАЧЕНИЕ
+                    physics.vy = scaledJumpPower;
                     physics.isGrounded = false;
                     physics.state = 'jumping';
                 } else {
@@ -224,7 +226,6 @@ class CombatSystem {
                 // 🔥 ОТПРАВЛЯЕМ СОБЫТИЕ СМЕНЫ СОСТОЯНИЯ НА 'fighting'
                 if (onStateChange) {
                     onStateChange(key, 'fighting');
-                  
                 }
                 return;
             } else {
@@ -286,14 +287,14 @@ export class GameWorld {
         this.platformsData = []; // данные платформ в процентах
 
         const defaultConfig = {
-            GRAVITY: 0.4,
-            JUMP_POWER: -8,
+            GRAVITY: 0.4, // Базовая гравитация для опорной высоты
+            JUMP_POWER: -9.5, // Базовая сила прыжка для опорной высоты
             WALK_SPEED_PERCENT_PER_SECOND: 4,
             CHAR_SIZE: 5, // размер персонажа в % от ширины мира
             COLLIDER_WIDTH_PERCENT: 50, // ширина коллайдера в % от размера персонажа
             DUEL_ZONE_MARGIN_PERCENT: 5, // ширина дуэль зоны
             DEBUG_COLLIDER: false,
-            WORLD_HEIGHT: 400,
+            WORLD_HEIGHT: 400, // Опорная высота, относительно которой считается физика
             MAX_LIFETIME: 900000,
             MAX_CHARACTERS: 20,
             MAX_MESSAGE_LENGTH: 110,
@@ -309,7 +310,7 @@ export class GameWorld {
             { left: 7, top: 58, width: 6.4, height: 20, allowJump: false }, // спинка лавочки слева
             { left: 6.8, top: 77, width: 6.8, height: 20 }, // лавочка слева
             { left: 29.3, top: 58, width: 6.4, height: 20, allowJump: false }, // спинка лавочки справа
-            { left: 29.1, top: 77, width: 6.8, height: 20 }, // лавочка справа
+            { left: 29.1, top: 77, width: 6.8, height: 20, allowJump: false }, // лавочка справа
             { left: 38.05, top: 59.5, width: 2.9, height: 20, allowJump: false }, // урна справа
             { left: 76.8, top: 75.5, width: 6.5, height: 20 }, // коробки
             { left: 69.8, top: 49.5, width: 25.5, height: 20 } // дом
@@ -343,6 +344,18 @@ export class GameWorld {
         this.characterRenderers.set(type, rendererClass);
     }
 
+    _updatePhysicsScale() {
+        const worldHeight = this.world.offsetHeight;
+        if (worldHeight === 0) return;
+
+        // Коэффициент масштабирования относительно WORLD_HEIGHT из конфига
+        const heightScale = worldHeight / this.config.WORLD_HEIGHT;
+
+        // Масштабируем гравитацию и силу прыжка пропорционально высоте экрана
+        this.scaledGravity = this.config.GRAVITY * heightScale;
+        this.scaledJumpPower = this.config.JUMP_POWER * heightScale;
+    }
+
     _addDecoration(src, alt, left, top, width, height, zIndex = 0, opacity = 1) {
         const img = document.createElement('img');
         img.src = src;
@@ -359,9 +372,7 @@ export class GameWorld {
         return img;
     }
 
-
     init() {
-
         this._createPlatforms(this.platformSettings);
 
         this._addDecoration(
@@ -373,8 +384,9 @@ export class GameWorld {
             '68.7%', '50%', '12%', 'auto', 999, 0.4
         );
 
-
         this._updateSpeedScale();
+        this._updatePhysicsScale(); // <--- НОВОЕ: Инициализация масштаба физики
+
         window.addEventListener('resize', this._handleResize);
         this._createLeaderboardElement();
         this._setupLeaderboardUpdates();
@@ -537,6 +549,7 @@ export class GameWorld {
         const pixelsPerSecond = (this.config.WALK_SPEED_PERCENT_PER_SECOND / 100) * worldWidth;
         this.walkSpeedPxPerFrame = pixelsPerSecond / this.config.TARGET_FPS;
     }
+
     // Получение координат платформ в пикселях на основе текущих размеров мира
     _getComputedPlatforms() {
         const worldWidth = this.world.offsetWidth;
@@ -568,6 +581,7 @@ export class GameWorld {
             });
         });
     }
+
     // Парсит строку вида "ник" / "платформа:ник" / "ник@платформа" 
     _parseTargetSpecifier(spec, defaultPlatform) {
         if (!spec) return null;
@@ -604,6 +618,7 @@ export class GameWorld {
         }
         return results;
     }
+
     // Проверяет возможность дуэли: цель не лузер, не в бою, существует. Если найдено несколько одинаковых ников – просит уточнить платформу.
     _resolveDuelTarget(attackerKey, targetSpec) {
         const attackerPlatform = attackerKey.split(':')[0];
@@ -1164,8 +1179,6 @@ export class GameWorld {
         setupFighter(leftChar, rightChar.physics.key, leftTargetX);
         setupFighter(rightChar, leftChar.physics.key, rightTargetX);
 
-
-
         // отправляем событие начала дуэли на вторую страницу
         this._sendDuelStart(keyA, keyB, leftChar, rightChar, worldWidth);
         if (!leftChar.physics.fightMoveToTarget && !rightChar.physics.fightMoveToTarget) {
@@ -1323,6 +1336,7 @@ export class GameWorld {
         const formatted = formatMessageWithEmotes(truncated, emotes);
         renderer.updateBubble(formatted, bubbleType);
     }
+
     // Позиционирование контейнера персонажа (коллайдер, смещение)
     _updateContainerPosition(renderer, physics) {
         const containerX = physics.colliderX - physics.colliderOffsetX;
@@ -1439,6 +1453,7 @@ export class GameWorld {
     _handleResize() {
         const oldSpeed = this.walkSpeedPxPerFrame;
         this._updateSpeedScale();
+        this._updatePhysicsScale(); // <--- НОВОЕ: Пересчёт при ресайзе
         this._updateAllCharacterSizes();
         this._revalidateDuelAfterResize();
         if (oldSpeed > 0 && this.walkSpeedPxPerFrame > 0) {
@@ -1512,16 +1527,19 @@ export class GameWorld {
         const worldHeight = this.world.offsetHeight;
         const now = Date.now();
         const platforms = this._getComputedPlatforms();
+
         for (let [key, entry] of this.characters) {
             const physics = entry.physics;
             const renderer = entry.renderer;
             if (physics.isRemoving) continue;
+
             // Снятие статуса лузера по таймеру
             if (physics.isLoser && physics.loserUntil && now > physics.loserUntil) {
                 physics.isLoser = false;
                 physics.loserUntil = 0;
                 renderer.setLoser(false);
             }
+
             // Обработка боя
             let isFightingActive = physics.isFighting && physics.fightTargetKey;
             if (isFightingActive) {
@@ -1533,10 +1551,26 @@ export class GameWorld {
                     (fighterKey, newState) => this._sendDuelStateChange(fighterKey, newState)
                 );
             } else {
-                AISystem.updateWandering(physics, this.walkSpeedPxPerFrame, this.config, delta, this.currentDuelZone);
+                AISystem.updateWandering(
+                    physics,
+                    this.walkSpeedPxPerFrame,
+                    this.scaledJumpPower, // <--- НОВОЕ: Передаем вычисленное значение
+                    this.config,
+                    delta,
+                    this.currentDuelZone
+                );
             }
+
             // Физика
-            PhysicsSystem.applyGravityAndMovement(physics, platforms, worldWidth, worldHeight, this.config, timeScale);
+            PhysicsSystem.applyGravityAndMovement(
+                physics,
+                platforms,
+                worldWidth,
+                worldHeight,
+                this.scaledGravity, // <--- НОВОЕ: Передаем вычисленное значение вместо this.config
+                timeScale
+            );
+
             // Визуальное состояние
             let visualState = physics.state;
             if (isFightingActive) {
@@ -1548,6 +1582,7 @@ export class GameWorld {
             }
             this._updateContainerPosition(renderer, physics);
             this._updateColliderBlockStyle(renderer, physics);
+
             // Проверка истечения HP
             const timeLeft = physics.dieTime - now;
 
@@ -1561,6 +1596,7 @@ export class GameWorld {
                     continue;
                 }
             }
+
             // Обновляем полоску жизни
             const percent = Math.max(0, ((physics.dieTime - now) / this.config.MAX_LIFETIME) * 100);
             renderer.updateLifeBar(percent);
