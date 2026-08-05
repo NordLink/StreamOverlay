@@ -25,3 +25,4 @@ Thumbs.db
 .idea/
 *.sln.iml
 StreamOverlay.Web/Data/duelStats.json
+bot_refresh_token.txt

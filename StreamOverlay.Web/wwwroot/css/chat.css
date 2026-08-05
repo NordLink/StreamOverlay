@@ -44,6 +44,7 @@ body {
     box-sizing: border-box;
     font-size: 5cqw;
     font-weight: bold;
+    line-height: 1.1;
 }
 
 @keyframes messageIn {
@@ -219,4 +220,36 @@ body {
     vertical-align: middle; 
     margin-right: 4px;
     display: inline-block;
+}
+
+.author {
+    display: inline-block;
+    vertical-align: baseline;
+}
+
+.user-badges {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.15em;
+    margin-right: 0.25em;
+    vertical-align: middle;
+}
+
+.user-badge {
+    display: inline-block;
+    width: 1em;
+    height: 1em;
+    object-fit: contain;
+    vertical-align: middle;
+}
+
+.user {
+    font-weight: bold;
+    margin-right: 0.3em;
+    vertical-align: middle;
+}
+
+.msg {
+    display: inline;
+    vertical-align: middle;
 }

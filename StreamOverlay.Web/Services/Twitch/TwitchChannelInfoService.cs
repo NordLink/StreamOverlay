@@ -5,19 +5,19 @@ public class TwitchChannelInfoService : BackgroundService
 {
     private readonly IOverlayBroadcastService _broadcast;
     private readonly IHttpClientFactory _httpClientFactory;
-    private readonly TwitchTokenProvider _tokenProvider;
+    private readonly TwitchAuthService _authService;
     private readonly TwitchOptions _options;
     private readonly ILogger<TwitchChannelInfoService> _logger;
     public TwitchChannelInfoService(
         IOverlayBroadcastService broadcast,
         IHttpClientFactory httpClientFactory,
-        TwitchTokenProvider tokenProvider,
+        TwitchAuthService tokenProvider,
         IOptions<TwitchOptions> options,
         ILogger<TwitchChannelInfoService> logger)
     {
         _broadcast = broadcast;
         _httpClientFactory = httpClientFactory;
-        _tokenProvider = tokenProvider;
+        _authService = tokenProvider;
         _options = options.Value;
         _logger = logger;
     }
@@ -49,7 +49,8 @@ public class TwitchChannelInfoService : BackgroundService
     }
     private async Task PushChannelInfoAsync(CancellationToken ct)
     {
-        var token = await _tokenProvider.GetTokenAsync(ct);
+        var tokenRes = await _authService.GetClientCredentialsAsync(ct);
+        var token = tokenRes?.AccessToken;
 
         if (string.IsNullOrWhiteSpace(token))
             return;
@@ -87,7 +88,8 @@ public class TwitchChannelInfoService : BackgroundService
     }
     private async Task PushViewerCountAsync(CancellationToken ct)
     {
-        var token = await _tokenProvider.GetTokenAsync(ct);
+        var tokenRes = await _authService.GetClientCredentialsAsync(ct);
+        var token = tokenRes?.AccessToken;
         if (string.IsNullOrWhiteSpace(token))
             return;
         try

@@ -43,8 +43,9 @@ public class SignalROverlayBroadcastService : IOverlayBroadcastService
             message = dto.Message,
             color = dto.Color,
             emotes = dto.Emotes,
+            badges = dto.Badges,
             time = dto.SendTime,
-            highlighted = dto.IsHighlighted 
+            highlighted = dto.IsHighlighted
         }, ct);
     }
 }

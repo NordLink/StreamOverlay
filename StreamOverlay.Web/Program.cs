@@ -7,6 +7,7 @@ var builder = WebApplication.CreateBuilder(args);
 
 builder.Services.AddSignalR();
 builder.Services.AddHttpClient();
+builder.Services.AddMemoryCache();
 
 builder.Services.Configure<TwitchOptions>(options =>
 {
@@ -41,7 +42,8 @@ builder.Services.Configure<VkLiveOptions>(options =>
 
 builder.Services.AddSingleton<IOverlayBroadcastService, SignalROverlayBroadcastService>();
 builder.Services.AddSingleton<OverlayStateService>();
-builder.Services.AddSingleton<TwitchTokenProvider>();
+builder.Services.AddSingleton<TwitchAuthService>();
+builder.Services.AddSingleton<TwitchBadgeService>();
 builder.Services.AddSingleton<IVkLiveApiClient, VkLiveApiClient>();
 builder.Services.AddHostedService<TwitchChannelInfoService>();
 builder.Services.AddHostedService<TwitchChatService>();
