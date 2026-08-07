@@ -5,6 +5,7 @@
     public string WatchChannel { get; set; } = "";
     public string BotUsername { get; set; } = "";
     public string BotOauth { get; set; } = "";
+    public string RedirectUri { get; set; } = "";
 }
 public class VkLiveOptions
 {

@@ -1,6 +1,7 @@
-using System.Text.Json;
-using System.Net;
 using Microsoft.Extensions.Options;
+using System.Net;
+using System.Net.Http.Headers;
+using System.Text.Json;
 
 public record TwitchAuthResult(
     string AccessToken,
@@ -42,6 +43,88 @@ public class TwitchAuthService : IDisposable
         {
             _logger.LogWarning(ex, "Не удалось загрузить начальный refresh token");
             _refreshToken = null;
+        }
+    }
+
+
+    public async Task<TwitchAuthResult?> ExchangeCodeForTokenAsync(
+    string code,
+    CancellationToken ct)
+    {
+        try
+        {
+            var http = _httpClientFactory.CreateClient();
+
+            using var content = new FormUrlEncodedContent(new Dictionary<string, string>
+            {
+                ["client_id"] = _options.ClientId,
+                ["client_secret"] = _options.ClientSecret,
+                ["code"] = code,
+                ["grant_type"] = "authorization_code",
+                ["redirect_uri"] = _options.RedirectUri
+            });
+
+            using var resp = await http.PostAsync(
+                "https://id.twitch.tv/oauth2/token",
+                content,
+                ct);
+
+            var body = await resp.Content.ReadAsStringAsync(ct);
+
+            if (!resp.IsSuccessStatusCode)
+            {
+                _logger.LogError(
+                    "ExchangeCodeForTokenAsync failed: {Status} {Body}",
+                    resp.StatusCode,
+                    body);
+
+                return null;
+            }
+
+            using var doc = JsonDocument.Parse(body);
+
+            var accessToken =
+                doc.RootElement.GetProperty("access_token").GetString();
+
+            var refreshToken =
+                doc.RootElement.GetProperty("refresh_token").GetString();
+
+            var expiresIn =
+                doc.RootElement.GetProperty("expires_in").GetInt32();
+
+            if (string.IsNullOrWhiteSpace(accessToken) ||
+                string.IsNullOrWhiteSpace(refreshToken))
+            {
+                _logger.LogError("Twitch вернул пустые токены.");
+
+                return null;
+            }
+
+            if (!SaveRefreshToken(refreshToken))
+            {
+                _logger.LogCritical(
+                    "Не удалось сохранить refresh token.");
+
+                return null;
+            }
+
+            _refreshToken = refreshToken;
+            _userAccessToken = accessToken;
+            _userExpires = DateTimeOffset.UtcNow.AddSeconds(expiresIn);
+
+            await NotifyUserTokenRefreshedAsync(accessToken);
+
+            return new TwitchAuthResult(
+                accessToken,
+                refreshToken,
+                expiresIn);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex,
+                "ExchangeCodeForTokenAsync");
+
+            return null;
         }
     }
 
@@ -270,8 +353,14 @@ public class TwitchAuthService : IDisposable
     {
         try
         {
-            var path = Path.Combine(AppContext.BaseDirectory, "bot_refresh_token.txt");
-            _logger.LogInformation("Поиск refresh token: {Path}", path);
+            var path = Path.Combine(
+                AppContext.BaseDirectory,
+                "bot_refresh_token.txt");
+
+            _logger.LogInformation(
+                "Поиск refresh token: {Path}",
+                path);
+
 
             if (File.Exists(path))
             {
@@ -279,30 +368,55 @@ public class TwitchAuthService : IDisposable
 
                 if (!string.IsNullOrWhiteSpace(value))
                 {
-                    _logger.LogInformation("Загружен refresh token из файла.");
+                    _logger.LogInformation(
+                        "Загружен refresh token из файла.");
+
                     return value;
                 }
-
-                _logger.LogWarning("Файл для хранения refresh token существует, но пуст.");
             }
-
-            var env = Environment.GetEnvironmentVariable("TWITCH_REFRESH_TOKEN");
-
-            if (!string.IsNullOrWhiteSpace(env))
-            {
-                _logger.LogInformation("Refresh token загружен из переменной окружения");
-                return env.Trim();
-            }
-
-            _logger.LogWarning("Refresh token не найден в переменной окружения.");
         }
         catch (Exception ex)
         {
-            _logger.LogWarning(ex, "Не удалось загрузить refresh token.");
+            _logger.LogWarning(
+                ex,
+                "Ошибка загрузки refresh token");
         }
+
+
+        _logger.LogWarning(
+            "Refresh token не найден.");
 
         return null;
     }
+
+    public async Task ValidateTokenAsync(CancellationToken ct)
+    {
+        var token = await GetUserAccessTokenAsync(ct);
+
+        if (token == null)
+        {
+            Console.WriteLine("USER TOKEN NULL");
+            return;
+        }
+
+        var http = _httpClientFactory.CreateClient();
+
+        using var req = new HttpRequestMessage(
+            HttpMethod.Get,
+            "https://id.twitch.tv/oauth2/validate");
+
+        req.Headers.Authorization =
+            new AuthenticationHeaderValue(
+                "OAuth",
+                token.AccessToken);
+
+        using var resp = await http.SendAsync(req, ct);
+
+        var json = await resp.Content.ReadAsStringAsync(ct);
+
+        Console.WriteLine(json);
+    }
+
 
     private bool SaveRefreshToken(string token)
     {

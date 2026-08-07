@@ -289,7 +289,7 @@ public class TwitchChatService : BackgroundService
             return colorFromTwitch;
         var seed = string.IsNullOrWhiteSpace(userName)
             ? "anonymous"
-            : userName.Trim().ToLowerInvariant();
+            : userName.Trim();
         unchecked
         {
             int hash = 5381;

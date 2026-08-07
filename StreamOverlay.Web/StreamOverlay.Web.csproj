@@ -11,9 +11,6 @@
 	<None Update="componentConfig.json">
 		<CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
 	</None>
-	<None Update="bot_refresh_token.txt">
-		<CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-	</None>
     <PackageReference Include="DotNetEnv" Version="3.1.1" />
     <PackageReference Include="TwitchLib.Api" Version="3.10.2" />
     <PackageReference Include="TwitchLib.Client" Version="4.0.1" />
