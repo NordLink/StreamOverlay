@@ -13,8 +13,6 @@
             padding: 0;
             box-sizing: border-box;
         }
-
-
         body {
             min-height: 100vh;
             background: radial-gradient(circle at 20% 30%, #0A141E, #0B1A2E);
@@ -25,8 +23,6 @@
             color: #E5E7EB;
             padding: 2rem;
         }
-
-
         .container {
             max-width: 900px;
             width: 100%;
@@ -37,9 +33,6 @@
             box-shadow: 0 25px 40px rgba(0,0,0,.5), 0 0 0 1px rgba(102,153,204,.2);
             text-align: center;
         }
-
-
-
         h1 {
             font-size: 2.5rem;
             font-weight: 600;
@@ -49,9 +42,6 @@
             color: transparent;
             margin-bottom: .75rem;
         }
-
-
-
         .container p {
             font-size: 1.1rem;
             color: #B0C4DE;
@@ -60,19 +50,12 @@
             display: inline-block;
             padding-bottom: .5rem;
         }
-
-
-
-
         .nav-links {
             display: flex;
             flex-wrap: wrap;
             justify-content: center;
             gap: 1.5rem;
         }
-
-
-
         .nav-link {
             display: inline-flex;
             align-items: center;
@@ -88,46 +71,26 @@
             box-shadow: 0 6px 0 #0F1A24;
             transition: all .2s ease;
         }
-
-
-
             .nav-link:hover {
                 transform: translateY(-3px);
                 background: linear-gradient( to bottom, #3C556E, #263B4F );
                 color: white;
             }
-
-
-
         .secondary {
             background: linear-gradient( to bottom, #27445e, #1C2F42 );
         }
-
-
-
-        /* Twitch кнопка */
-
         .twitch {
             border-color: rgba(145,70,255,.8);
             background: linear-gradient( to bottom, #9146FF, #6441A5 );
             color: white;
         }
-
-
             .twitch:hover {
                 background: linear-gradient( to bottom, #A970FF, #7952C6 );
             }
-
-
-
-
         @media(max-width:550px) {
-
             h1 {
                 font-size: 1.8rem;
             }
-
-
             .nav-link {
                 font-size: 1rem;
                 padding: .7rem 1.4rem;
@@ -137,61 +100,30 @@
 
 </head>
 
-
 <body>
-
-
     <div class="container">
-
-
         <h1>
             StreamOverlay Panel
         </h1>
-
-
         <p>
             Выберите нужный раздел:
         </p>
-
-
-
         <div class="nav-links">
-
-
-
             <a href="/demo"
                class="nav-link"
                target="_blank">
-
                 🖥️ Демо-сцена
-
             </a>
-
-
-
-
             <a href="/overlay"
                class="nav-link secondary"
                target="_blank">
-
                 🎥 Оверлей
-
             </a>
-
-
-
-
             <a href="/chat"
                class="nav-link"
                target="_blank">
-
                 💬 Чат
-
             </a>
-
-
-
-
             <a href="/viewers"
                class="nav-link secondary"
                target="_blank">
@@ -200,7 +132,11 @@
 
             </a>
 
-
+            <a href="/chatters"
+               class="nav-link"
+               target="_blank">
+                👥 Зрители
+            </a>
 
 
             <a href="/dueldisplay"
@@ -210,11 +146,6 @@
                 ⚔️ Дуэль
 
             </a>
-
-
-
-
-            <!-- Twitch OAuth -->
 
             <a href="/auth/twitch/login"
                class="nav-link twitch">
@@ -234,4 +165,3 @@
 
 </body>
 </html>
-```

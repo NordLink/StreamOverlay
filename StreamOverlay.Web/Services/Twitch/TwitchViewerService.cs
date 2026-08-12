@@ -1,7 +1,6 @@
-﻿using System.Net.Http.Headers;
-using System.Text;
+﻿using Microsoft.Extensions.Options;
+using System.Net.Http.Headers;
 using System.Text.Json;
-using Microsoft.Extensions.Options;
 
 public class TwitchViewerService : BackgroundService
 {
@@ -12,8 +11,12 @@ public class TwitchViewerService : BackgroundService
 
     private readonly TimeSpan _chattersRefreshInterval = TimeSpan.FromSeconds(30);
 
+    private readonly Dictionary<string, DateTime> _chatterFirstSeen = new();
+
     private string? _broadcasterId;
     private string? _moderatorId;
+    private List<ViewerInfo> _viewers = new();
+    private readonly object _viewersLock = new();
 
     public TwitchViewerService(
         IHttpClientFactory httpClientFactory,
@@ -27,10 +30,11 @@ public class TwitchViewerService : BackgroundService
         _logger = logger;
     }
 
-    private class ViewerInfo
+    public class ViewerInfo
     {
         public string Login { get; init; } = "";
         public string DisplayName { get; init; } = "";
+        public DateTime DetectedAt { get; set; }
     }
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
@@ -76,7 +80,16 @@ public class TwitchViewerService : BackgroundService
             {
                 var viewers = await GetChattersAsync(stoppingToken);
 
-                PrintTable(viewers);
+                UpdateChatterTimes(viewers);
+
+                var sortedViewers = viewers
+                    .OrderByDescending(x => _chatterFirstSeen[x.Login])
+                    .ToList();
+
+                lock (_viewersLock)
+                {
+                    _viewers = sortedViewers;
+                }
             }
             catch (Exception ex)
             {
@@ -86,6 +99,34 @@ public class TwitchViewerService : BackgroundService
             await Task.Delay(
                 _chattersRefreshInterval,
                 stoppingToken);
+        }
+    }
+
+    private void UpdateChatterTimes(List<ViewerInfo> chatters)
+    {
+        var now = DateTime.UtcNow;
+
+        foreach (var chatter in chatters)
+        {
+            if (!_chatterFirstSeen.ContainsKey(chatter.Login))
+            {
+                _chatterFirstSeen[chatter.Login] = now;
+            }
+
+            chatter.DetectedAt = _chatterFirstSeen[chatter.Login];
+        }
+
+        var currentLogins = chatters
+            .Select(x => x.Login)
+            .ToHashSet();
+
+        var disappeared = _chatterFirstSeen.Keys
+            .Where(login => !currentLogins.Contains(login))
+            .ToList();
+
+        foreach (var login in disappeared)
+        {
+            _chatterFirstSeen.Remove(login);
         }
     }
 
@@ -127,6 +168,14 @@ public class TwitchViewerService : BackgroundService
         return data[0]
             .GetProperty("id")
             .GetString();
+    }
+
+    public IReadOnlyList<ViewerInfo> GetViewers()
+    {
+        lock (_viewersLock)
+        {
+            return _viewers.ToList();
+        }
     }
 
     private async Task<string?> ResolveCurrentUserIdAsync(
@@ -250,37 +299,7 @@ public class TwitchViewerService : BackgroundService
 
         } while (!string.IsNullOrWhiteSpace(cursor));
 
-        _logger.LogInformation(
-            "Загружено {Count} chatters.",
-            result.Count);
-
         return result;
     }
 
-    private void PrintTable(List<ViewerInfo> viewers)
-    {
-        Console.WriteLine();
-
-        Console.WriteLine(
-            $"Участники чата: {viewers.Count}");
-
-        Console.WriteLine();
-
-        Console.WriteLine(
-            "{0,-25}",
-            "Никнейм");
-
-        Console.WriteLine(
-            new string('-', 25));
-
-
-        foreach (var viewer in viewers)
-        {
-            Console.WriteLine(
-                "{0,-25}",
-                viewer.DisplayName);
-        }
-
-        Console.WriteLine();
-    }
 }

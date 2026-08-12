@@ -1,0 +1,509 @@
+﻿<!DOCTYPE html>
+
+<html lang="ru">
+
+<head>
+
+    <meta charset="UTF-8">
+
+    <meta name="viewport"
+          content="width=device-width, initial-scale=1.0">
+
+    <title>Overly — Chatters</title>
+
+
+    <style>
+
+        * {
+            box-sizing: border-box;
+        }
+
+
+        html,
+        body {
+            margin: 0;
+            padding: 0;
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+            background: transparent;
+            font-family: Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+            color: white;
+        }
+
+        .viewer-widget {
+            width: 300px;
+            height: 506px;
+            display: flex;
+            flex-direction: column;
+            border-radius: 14px;
+            background: linear-gradient( 145deg, rgba(20, 20, 28, 0.94), rgba(10, 10, 15, 0.94) );
+            border: 1px solid rgba(255, 255, 255, 0.07);
+            overflow: hidden;
+            backdrop-filter: blur(15px);
+            -webkit-backdrop-filter: blur(15px);
+        }
+
+        .widget-header {
+            height: 56px;
+            flex-shrink: 0;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 0 15px;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.055);
+        }
+
+
+        .header-left {
+            display: flex;
+            align-items: center;
+            gap: 9px;
+        }
+
+
+        .header-icon {
+            width: 29px;
+            height: 29px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 8px;
+            background: rgba(255, 255, 255, 0.055);
+            font-size: 14px;
+        }
+
+
+        .header-title {
+            display: flex;
+            flex-direction: column;
+        }
+
+
+            .header-title strong {
+                font-size: 12px;
+                font-weight: 700;
+                letter-spacing: 0.4px;
+            }
+
+
+        .viewer-count {
+            min-width: 29px;
+            height: 25px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 0 7px;
+            border-radius: 7px;
+            background: rgba(255, 255, 255, 0.055);
+            color: rgba(255, 255, 255, 1);
+            font-size: 13px;
+            font-weight: 700;
+        }
+
+        .viewer-list {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+            padding: 8px;
+            overflow-y: auto;
+            overflow-x: hidden;
+            scrollbar-width: thin;
+            scrollbar-color: rgba(255, 255, 255, 0.12) transparent;
+        }
+
+
+            .viewer-list::-webkit-scrollbar {
+                width: 5px;
+            }
+
+
+            .viewer-list::-webkit-scrollbar-track {
+                background: transparent;
+            }
+
+
+            .viewer-list::-webkit-scrollbar-thumb {
+                background: rgba(255, 255, 255, 0.12);
+                border-radius: 10px;
+            }
+
+
+                .viewer-list::-webkit-scrollbar-thumb:hover {
+                    background: rgba(255, 255, 255, 0.2);
+                }
+
+        .viewer {
+            position: relative;
+            min-height: 40px;
+            flex-shrink: 0;
+            display: flex;
+            align-items: center;
+            padding: 0 10px;
+            border-radius: 9px;
+            background: rgba(255, 255, 255, 0.035);
+            border: 1px solid rgba(255, 255, 255, 0.035);
+            transition: background 0.2s ease, opacity 0.25s ease;
+        }
+
+
+            .viewer:hover {
+                background: rgba(255, 255, 255, 0.06);
+            }
+
+            .viewer.new-viewer {
+                animation: viewerAppear 0.4s cubic-bezier(.2, .8, .2, 1);
+            }
+
+
+        @keyframes viewerAppear {
+
+            0% {
+                opacity: 0;
+                transform: translateY(-12px) scale(0.98);
+            }
+
+            70% {
+                opacity: 1;
+                transform: translateY(1px) scale(1.005);
+            }
+
+            100% {
+                opacity: 1;
+                transform: translateY(0) scale(1);
+            }
+        }
+
+        .platform-dot {
+            width: 7px;
+            height: 7px;
+            flex-shrink: 0;
+            margin-right: 9px;
+            border-radius: 50%;
+        }
+
+
+            .platform-dot.twitch {
+                background: #9146ff;
+                box-shadow: 0 0 7px rgba(145, 70, 255, 0.55);
+            }
+
+        .viewer-name {
+            min-width: 0;
+            flex: 1;
+            overflow: hidden;
+            white-space: nowrap;
+            text-overflow: ellipsis;
+            font-size: 13px;
+            font-weight: 600;
+            color: rgba(255, 255, 255, 1);
+        }
+
+        .viewer-time {
+            width: 42px;
+            margin-left: 7px;
+            text-align: right;
+            font-size: 12px;
+            font-weight: 500;
+            color: rgba(255, 255, 255, 0.9);
+        }
+
+        .empty-state {
+            flex: 1;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            flex-direction: column;
+            gap: 5px;
+            color: rgba(255, 255, 255, 0.22);
+        }
+
+        .empty-icon {
+            font-size: 20px;
+        }
+
+
+        .empty-text {
+            font-size: 9px;
+        }
+
+        .viewer.removing {
+            opacity: 0;
+            transform: translateX(20px) scale(0.98);
+            transition: opacity 0.25s ease, transform 0.25s ease;
+        }
+    </style>
+
+</head>
+
+<body>
+    <div class="viewer-widget">
+        <div class="widget-header">
+            <div class="header-left">
+                <div class="header-icon">
+                    👁
+                </div>
+                <div class="header-title">
+                    <strong>
+                        Зрители
+                    </strong>
+                </div>
+            </div>
+            <div class="viewer-count"
+                 id="viewerCount">
+                0
+            </div>
+        </div>
+        <div class="viewer-list"
+             id="viewerList">
+            <div class="empty-state"
+                 id="emptyState">
+                <div class="empty-icon">
+                    👀
+                </div>
+                <div class="empty-text">
+                    Пока никто не смотрит
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const API_URL = "/api/chatters";
+        const UPDATE_INTERVAL = 30000;
+
+        const viewerList = document.getElementById("viewerList");
+        const viewerCount = document.getElementById("viewerCount");
+        const emptyState = document.getElementById("emptyState");
+
+        const viewers = new Map();
+
+        async function loadChatters() {
+            try {
+                const response = await fetch(API_URL, { cache: "no-store" });
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}`);
+                }
+                const chatters = await response.json();
+                if (!Array.isArray(chatters)) {
+                    return;
+                }
+
+                const list = chatters.map(chatter => {
+                    const detectedAt = new Date(chatter.detectedAt).getTime();
+                    return {
+                        id: String(chatter.login),
+                        name: chatter.displayName || chatter.login,
+                        platform: "twitch",
+                        joinedAt: detectedAt
+                    };
+                });
+
+                updateViewers(list);
+            } catch (error) {
+                console.error("Ошибка загрузки chatters:", error);
+            }
+        }
+
+        function updateViewers(list) {
+            if (!Array.isArray(list)) {
+                return;
+            }
+
+            list.sort((a, b) => b.joinedAt - a.joinedAt);
+
+            const newIds = new Set(list.map(viewer => viewer.id));
+
+            Array.from(viewers.keys()).forEach(id => {
+                if (!newIds.has(id)) {
+                    removeViewer(id);
+                }
+            });
+
+            list.forEach(viewer => {
+                const existing = viewers.get(viewer.id);
+                if (!existing) {
+                    addViewer(viewer, true);
+                    return;
+                }
+                existing.name = viewer.name;
+                updateViewerElement(existing);
+            });
+
+            syncViewerOrder();
+            updateCounter();
+            updateEmptyState();
+        }
+
+        function addViewer(viewer, animate = false) {
+            if (!viewer || !viewer.id) {
+                return;
+            }
+            const id = String(viewer.id);
+            viewer.id = id;
+            if (!viewer.joinedAt) {
+                viewer.joinedAt = Date.now();
+            }
+            viewers.set(id, viewer);
+            createViewerElement(viewer, animate);
+            updateCounter();
+            updateEmptyState();
+        }
+
+        function removeViewer(id) {
+            id = String(id);
+            if (!viewers.has(id)) {
+                return;
+            }
+
+            viewers.delete(id);
+            const element = document.querySelector(`.viewer[data-id="${CSS.escape(id)}"]`);
+
+            if (!element) {
+                updateCounter();
+                updateEmptyState();
+                return;
+            }
+
+            /*
+              Плавно исчезаем.
+            */
+            element.classList.add("removing");
+
+            setTimeout(() => {
+                element.remove();
+                updateCounter();
+                updateEmptyState();
+            }, 260);
+        }
+
+        function createViewerElement(viewer, animate = false) {
+            emptyState.style.display = "none";
+
+            const element = document.createElement("div");
+            element.className = "viewer";
+            if (animate) {
+                element.classList.add("new-viewer");
+            }
+            element.dataset.id = viewer.id;
+
+            element.innerHTML = `
+      <div class="platform-dot twitch"></div>
+      <div class="viewer-name">${escapeHtml(viewer.name || "Unknown")}</div>
+      <div class="viewer-time">${formatTime(viewer.joinedAt)}</div>
+    `;
+
+            viewerList.appendChild(element);
+        }
+
+        function syncViewerOrder() {
+            const elements = Array.from(viewerList.querySelectorAll(".viewer"));
+
+            elements.sort((a, b) => {
+                const viewerA = viewers.get(a.dataset.id);
+                const viewerB = viewers.get(b.dataset.id);
+                if (!viewerA || !viewerB) {
+                    return 0;
+                }
+                return viewerB.joinedAt - viewerA.joinedAt;
+            });
+
+            const fragment = document.createDocumentFragment();
+            elements.forEach(element => {
+                fragment.appendChild(element);
+            });
+            viewerList.appendChild(fragment);
+        }
+
+        function updateViewerElement(viewer) {
+            const element = document.querySelector(`.viewer[data-id="${CSS.escape(viewer.id)}"]`);
+            if (!element) {
+                return;
+            }
+            const name = element.querySelector(".viewer-name");
+            if (name) {
+                name.textContent = viewer.name || "Unknown";
+            }
+        }
+
+        function updateCounter() {
+            viewerCount.textContent = viewers.size;
+        }
+
+        function updateEmptyState() {
+            emptyState.style.display = viewers.size === 0 ? "flex" : "none";
+        }
+
+        function formatTime(timestamp) {
+            if (!timestamp) {
+                return "сейчас";
+            }
+
+            const seconds = Math.floor((Date.now() - timestamp) / 1000);
+
+            if (seconds < 10) {
+                return "сейчас";
+            }
+            if (seconds < 60) {
+                return `${seconds}с`;
+            }
+
+            const minutes = Math.floor(seconds / 60);
+            if (minutes < 60) {
+                return `${minutes}м`;
+            }
+
+            const hours = Math.floor(minutes / 60);
+            return `${hours}ч`;
+        }
+
+        setInterval(() => {
+            viewers.forEach(viewer => {
+                const element = document.querySelector(`.viewer[data-id="${CSS.escape(viewer.id)}"]`);
+                if (!element) {
+                    return;
+                }
+                const time = element.querySelector(".viewer-time");
+                if (time) {
+                    time.textContent = formatTime(viewer.joinedAt);
+                }
+            });
+        }, 30000);
+
+        function escapeHtml(value) {
+            return String(value)
+                .replace(/&/g, "&amp;")
+                .replace(/</g, "&lt;")
+                .replace(/>/g, "&gt;")
+                .replace(/"/g, "&quot;")
+                .replace(/'/g, "&#039;");
+        }
+
+        loadChatters();
+        setInterval(loadChatters, UPDATE_INTERVAL);
+
+        window.Viewers = {
+            add(viewer) {
+                addViewer(viewer, true);
+                syncViewerOrder();
+            },
+            remove(id) {
+                removeViewer(id);
+            },
+            getAll() {
+                return Array.from(viewers.values());
+            },
+            clear() {
+                Array.from(viewers.keys()).forEach(id => removeViewer(id));
+            },
+            setAll(list) {
+                updateViewers(list);
+            }
+        };
+    </script>
+
+
+</body>
+
+</html>

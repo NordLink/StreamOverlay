@@ -414,7 +414,7 @@ public class TwitchAuthService : IDisposable
 
         var json = await resp.Content.ReadAsStringAsync(ct);
 
-        Console.WriteLine(json);
+        //Console.WriteLine(json); // вывод информации о токене для отладки
     }
 
 
