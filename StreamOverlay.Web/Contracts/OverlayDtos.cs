@@ -27,3 +27,13 @@ public record OverlayChatMessageDto(
     bool? IsHighlighted = false
  );
 
+public record OverlayViewerDto(
+    string Login,
+    string DisplayName,
+    DateTime DetectedAt
+);
+
+public record OverlayViewerLeftDto
+{
+    public string Login { get; init; } = "";
+}

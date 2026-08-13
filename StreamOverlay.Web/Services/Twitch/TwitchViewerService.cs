@@ -2,46 +2,56 @@
 using System.Net.Http.Headers;
 using System.Text.Json;
 
+public class ViewerInfo
+{
+    public string Login { get; init; } = "";
+    public string DisplayName { get; init; } = "";
+    public DateTime DetectedAt { get; set; }
+}
+
 public class TwitchViewerService : BackgroundService
 {
     private readonly IHttpClientFactory _httpClientFactory;
     private readonly TwitchAuthService _authService;
     private readonly TwitchOptions _options;
+    private readonly IOverlayBroadcastService _broadcastService;
     private readonly ILogger<TwitchViewerService> _logger;
 
-    private readonly TimeSpan _chattersRefreshInterval = TimeSpan.FromSeconds(30);
+    private readonly TimeSpan _chattersRefreshInterval =
+        TimeSpan.FromSeconds(30);
 
-    private readonly Dictionary<string, DateTime> _chatterFirstSeen = new();
+    private readonly Dictionary<string, DateTime> _chatterFirstSeen =
+        new(StringComparer.OrdinalIgnoreCase);
 
     private string? _broadcasterId;
     private string? _moderatorId;
+
     private List<ViewerInfo> _viewers = new();
+
     private readonly object _viewersLock = new();
 
     public TwitchViewerService(
         IHttpClientFactory httpClientFactory,
         TwitchAuthService authService,
         IOptions<TwitchOptions> options,
-        ILogger<TwitchViewerService> logger)
+        ILogger<TwitchViewerService> logger,
+        IOverlayBroadcastService broadcastService)
     {
         _httpClientFactory = httpClientFactory;
         _authService = authService;
         _options = options.Value;
         _logger = logger;
+        _broadcastService = broadcastService;
     }
 
-    public class ViewerInfo
-    {
-        public string Login { get; init; } = "";
-        public string DisplayName { get; init; } = "";
-        public DateTime DetectedAt { get; set; }
-    }
-
-    protected override async Task ExecuteAsync(CancellationToken stoppingToken)
+    protected override async Task ExecuteAsync(
+        CancellationToken stoppingToken)
     {
         if (string.IsNullOrWhiteSpace(_options.WatchChannel))
         {
-            _logger.LogWarning("WATCH_CHANNEL не настроен.");
+            _logger.LogWarning(
+                "WATCH_CHANNEL не настроен.");
+
             return;
         }
 
@@ -55,15 +65,20 @@ public class TwitchViewerService : BackgroundService
 
         if (_broadcasterId == null)
         {
-            _logger.LogError("Не удалось определить broadcaster id.");
+            _logger.LogError(
+                "Не удалось определить broadcaster id.");
+
             return;
         }
 
-        _moderatorId = await ResolveCurrentUserIdAsync(stoppingToken);
+        _moderatorId = await ResolveCurrentUserIdAsync(
+            stoppingToken);
 
         if (_moderatorId == null)
         {
-            _logger.LogError("Не удалось определить moderator id.");
+            _logger.LogError(
+                "Не удалось определить moderator id.");
+
             return;
         }
 
@@ -72,53 +87,124 @@ public class TwitchViewerService : BackgroundService
             _broadcasterId,
             _moderatorId);
 
-        DateTime lastSubscribersUpdate = DateTime.MinValue;
-
         while (!stoppingToken.IsCancellationRequested)
         {
             try
             {
-                var viewers = await GetChattersAsync(stoppingToken);
+                var viewers = await GetChattersAsync(
+                    stoppingToken);
 
-                UpdateChatterTimes(viewers);
-
-                var sortedViewers = viewers
-                    .OrderByDescending(x => _chatterFirstSeen[x.Login])
-                    .ToList();
-
-                lock (_viewersLock)
-                {
-                    _viewers = sortedViewers;
-                }
+                await ProcessChattersAsync(
+                    viewers,
+                    stoppingToken);
+            }
+            catch (OperationCanceledException)
+                when (stoppingToken.IsCancellationRequested)
+            {
+                break;
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Ошибка ViewerService");
+                _logger.LogError(
+                    ex,
+                    "Ошибка TwitchViewerService");
             }
 
-            await Task.Delay(
-                _chattersRefreshInterval,
-                stoppingToken);
+            try
+            {
+                await Task.Delay(
+                    _chattersRefreshInterval,
+                    stoppingToken);
+            }
+            catch (OperationCanceledException)
+                when (stoppingToken.IsCancellationRequested)
+            {
+                break;
+            }
         }
     }
 
-    private void UpdateChatterTimes(List<ViewerInfo> chatters)
+    private async Task ProcessChattersAsync(
+        List<ViewerInfo> chatters,
+        CancellationToken ct)
+    {
+        var currentLogins = chatters
+            .Select(x => x.Login)
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
+
+        HashSet<string> previousLogins;
+
+        lock (_viewersLock)
+        {
+            previousLogins = _viewers
+                .Select(x => x.Login)
+                .ToHashSet(StringComparer.OrdinalIgnoreCase);
+        }
+
+        // Новые зрители
+        var joined = chatters
+            .Where(x => !previousLogins.Contains(x.Login))
+            .ToList();
+
+        // Вышедшие зрители
+        var left = previousLogins
+            .Where(login => !currentLogins.Contains(login))
+            .ToList();
+
+        // Обновляем время первого обнаружения
+        UpdateChatterTimes(chatters);
+
+        // самые недавно обнаруженные — сверху
+        var sortedViewers = chatters
+            .OrderByDescending(x => x.DetectedAt)
+            .ToList();
+
+        lock (_viewersLock)
+        {
+            _viewers = sortedViewers;
+        }
+
+        foreach (var viewer in joined)
+        {
+            await _broadcastService.SendViewerJoinedAsync(
+                new OverlayViewerDto(
+                    viewer.Login,
+                    viewer.DisplayName,
+                    viewer.DetectedAt),
+                ct);
+        }
+
+        foreach (var login in left)
+        {
+            await _broadcastService.SendViewerLeftAsync(
+                new OverlayViewerLeftDto
+                {
+                    Login = login
+                },
+                ct);
+        }
+    }
+
+    private void UpdateChatterTimes(
+        List<ViewerInfo> chatters)
     {
         var now = DateTime.UtcNow;
 
         foreach (var chatter in chatters)
         {
-            if (!_chatterFirstSeen.ContainsKey(chatter.Login))
+            if (!_chatterFirstSeen.ContainsKey(
+                    chatter.Login))
             {
                 _chatterFirstSeen[chatter.Login] = now;
             }
 
-            chatter.DetectedAt = _chatterFirstSeen[chatter.Login];
+            chatter.DetectedAt =
+                _chatterFirstSeen[chatter.Login];
         }
 
         var currentLogins = chatters
             .Select(x => x.Login)
-            .ToHashSet();
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
 
         var disappeared = _chatterFirstSeen.Keys
             .Where(login => !currentLogins.Contains(login))
@@ -134,36 +220,49 @@ public class TwitchViewerService : BackgroundService
         string login,
         CancellationToken ct)
     {
-        var token = await _authService.GetClientCredentialsAsync(ct);
+        var token =
+            await _authService.GetClientCredentialsAsync(ct);
 
         if (token == null)
+        {
             return null;
+        }
 
-        var http = _httpClientFactory.CreateClient();
+        var http =
+            _httpClientFactory.CreateClient();
 
         using var req = new HttpRequestMessage(
             HttpMethod.Get,
             $"https://api.twitch.tv/helix/users?login={login}");
 
-        req.Headers.Add("Client-Id", _options.ClientId);
+        req.Headers.Add(
+            "Client-Id",
+            _options.ClientId);
 
         req.Headers.Authorization =
             new AuthenticationHeaderValue(
                 "Bearer",
                 token.AccessToken);
 
-        using var resp = await http.SendAsync(req, ct);
+        using var resp =
+            await http.SendAsync(req, ct);
 
         if (!resp.IsSuccessStatusCode)
+        {
             return null;
+        }
 
-        using var doc = JsonDocument.Parse(
-            await resp.Content.ReadAsStringAsync(ct));
+        using var doc =
+            JsonDocument.Parse(
+                await resp.Content.ReadAsStringAsync(ct));
 
-        var data = doc.RootElement.GetProperty("data");
+        var data =
+            doc.RootElement.GetProperty("data");
 
         if (data.GetArrayLength() == 0)
+        {
             return null;
+        }
 
         return data[0]
             .GetProperty("id")
@@ -181,78 +280,101 @@ public class TwitchViewerService : BackgroundService
     private async Task<string?> ResolveCurrentUserIdAsync(
         CancellationToken ct)
     {
-        var token = await _authService.GetUserAccessTokenAsync(ct);
+        var token =
+            await _authService.GetUserAccessTokenAsync(ct);
 
         if (token == null)
+        {
             return null;
+        }
 
-        var http = _httpClientFactory.CreateClient();
+        var http =
+            _httpClientFactory.CreateClient();
 
         using var req = new HttpRequestMessage(
             HttpMethod.Get,
             "https://api.twitch.tv/helix/users");
 
-        req.Headers.Add("Client-Id", _options.ClientId);
+        req.Headers.Add(
+            "Client-Id",
+            _options.ClientId);
 
         req.Headers.Authorization =
             new AuthenticationHeaderValue(
                 "Bearer",
                 token.AccessToken);
 
-        using var resp = await http.SendAsync(req, ct);
+        using var resp =
+            await http.SendAsync(req, ct);
 
         if (!resp.IsSuccessStatusCode)
+        {
             return null;
+        }
 
-        using var doc = JsonDocument.Parse(
-            await resp.Content.ReadAsStringAsync(ct));
+        using var doc =
+            JsonDocument.Parse(
+                await resp.Content.ReadAsStringAsync(ct));
 
-        var data = doc.RootElement.GetProperty("data");
+        var data =
+            doc.RootElement.GetProperty("data");
 
         if (data.GetArrayLength() == 0)
+        {
             return null;
+        }
 
         return data[0]
             .GetProperty("id")
             .GetString();
     }
 
-    private async Task<List<ViewerInfo>> GetChattersAsync(CancellationToken ct)
+    private async Task<List<ViewerInfo>> GetChattersAsync(
+        CancellationToken ct)
     {
         var result = new List<ViewerInfo>();
 
-        var token = await _authService.GetUserAccessTokenAsync(ct);
+        var token =
+            await _authService.GetUserAccessTokenAsync(ct);
 
         if (token == null)
+        {
             return result;
+        }
 
-        var http = _httpClientFactory.CreateClient();
+        var http =
+            _httpClientFactory.CreateClient();
 
         string? cursor = null;
 
         do
         {
             var url =
-                $"https://api.twitch.tv/helix/chat/chatters" +
+                "https://api.twitch.tv/helix/chat/chatters" +
                 $"?broadcaster_id={_broadcasterId}" +
                 $"&moderator_id={_moderatorId}" +
-                $"&first=100";
+                "&first=100";
 
             if (!string.IsNullOrWhiteSpace(cursor))
+            {
                 url += $"&after={cursor}";
+            }
 
             using var req = new HttpRequestMessage(
                 HttpMethod.Get,
                 url);
 
-            req.Headers.Add("Client-Id", _options.ClientId);
+            req.Headers.Add(
+                "Client-Id",
+                _options.ClientId);
 
             req.Headers.Authorization =
                 new AuthenticationHeaderValue(
                     "Bearer",
                     token.AccessToken);
 
-            using var resp = await http.SendAsync(req, ct);
+            using var resp =
+                await http.SendAsync(req, ct);
 
             if (!resp.IsSuccessStatusCode)
             {
@@ -263,24 +385,26 @@ public class TwitchViewerService : BackgroundService
                 return result;
             }
 
-            using var doc = JsonDocument.Parse(
-                await resp.Content.ReadAsStringAsync(ct));
+            using var doc =
+                JsonDocument.Parse(
+                    await resp.Content.ReadAsStringAsync(ct));
 
             foreach (var chatter in
                      doc.RootElement
                         .GetProperty("data")
                         .EnumerateArray())
             {
-                result.Add(new ViewerInfo
-                {
-                    Login = chatter
-                        .GetProperty("user_login")
-                        .GetString() ?? "",
+                result.Add(
+                    new ViewerInfo
+                    {
+                        Login = chatter
+                            .GetProperty("user_login")
+                            .GetString() ?? "",
 
-                    DisplayName = chatter
-                        .GetProperty("user_name")
-                        .GetString() ?? ""
-                });
+                        DisplayName = chatter
+                            .GetProperty("user_name")
+                            .GetString() ?? ""
+                    });
             }
 
             cursor = null;
@@ -293,7 +417,8 @@ public class TwitchViewerService : BackgroundService
                         "cursor",
                         out var cursorElement))
                 {
-                    cursor = cursorElement.GetString();
+                    cursor =
+                        cursorElement.GetString();
                 }
             }
 
@@ -301,5 +426,4 @@ public class TwitchViewerService : BackgroundService
 
         return result;
     }
-
 }

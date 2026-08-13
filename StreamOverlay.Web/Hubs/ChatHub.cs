@@ -6,10 +6,13 @@ public class ChatHub : Hub
     private readonly OverlayStateService _stateService;
     private readonly IDuelResultService _duelResultService;
 
-    public ChatHub(OverlayStateService stateService, IDuelResultService duelResultService)
+    private readonly TwitchViewerService _viewerService;
+
+    public ChatHub(OverlayStateService stateService, IDuelResultService duelResultService, TwitchViewerService viewerService)
     {
         _stateService = stateService;
         _duelResultService = duelResultService;
+        _viewerService = viewerService;
     }
 
     public override async Task OnConnectedAsync()
@@ -35,6 +38,24 @@ public class ChatHub : Hub
                 isLive = viewers.IsLive
             });
         }
+    }
+
+    public async Task RequestViewers()
+    {
+        var viewers = _viewerService.GetViewers()
+            .Select(x => new
+            {
+                login = x.Login,
+                displayName = x.DisplayName,
+                detectedAt = x.DetectedAt
+            })
+            .ToList();
+
+
+        await Clients.Caller.SendAsync(
+            "viewersInitial",
+            viewers);
+
     }
     public async Task RequestLeaderboard()
     {

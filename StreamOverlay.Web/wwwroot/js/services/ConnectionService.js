@@ -7,25 +7,64 @@
 
         this.status = "CONNECTING";
 
-        // Коллбеки для событий
+        // Коллбеки событий
         this.onChannelInfoCallback = null;
         this.onViewerCountCallback = null;
         this.onChatMessageCallback = null;
+
+        this.onViewerJoinedCallback = null;
+        this.onViewerLeftCallback = null;
+        this.onInitialViewersCallback = null;
+
         this.onStatusChangeCallback = null;
         this.onLeaderboardUpdateCallback = null;
         this.onPlayerStatsCallback = null;
+
         this._setupListeners();
     }
 
     _setupListeners() {
         this.connection.on("channelInfo", (payload) => {
-            if (this.onChannelInfoCallback) this.onChannelInfoCallback(payload);
+            if (this.onChannelInfoCallback) {
+                this.onChannelInfoCallback(payload);
+            }
         });
+
         this.connection.on("viewerCount", (payload) => {
-            if (this.onViewerCountCallback) this.onViewerCountCallback(payload);
+            if (this.onViewerCountCallback) {
+                this.onViewerCountCallback(payload);
+            }
         });
+
         this.connection.on("chatMessage", (payload) => {
-            if (this.onChatMessageCallback) this.onChatMessageCallback(payload);
+            if (this.onChatMessageCallback) {
+                this.onChatMessageCallback(payload);
+            }
+        });
+
+        this.connection.on("viewersInitial", (payload) => {
+
+            console.log(
+                "[ConnectionService] viewersInitial:",
+                payload
+            );
+
+            if (this.onInitialViewersCallback) {
+                this.onInitialViewersCallback(payload);
+            }
+
+        });
+
+        this.connection.on("viewerJoined", (payload) => {
+            if (this.onViewerJoinedCallback) {
+                this.onViewerJoinedCallback(payload);
+            }
+        });
+
+        this.connection.on("viewerLeft", (payload) => {
+            if (this.onViewerLeftCallback) {
+                this.onViewerLeftCallback(payload);
+            }
         });
 
         this.connection.on("leaderboardUpdate", (data) => {
@@ -35,26 +74,71 @@
         });
 
         this.connection.on("playerStats", (callerKey, playerKey, stats) => {
-            if (this.onPlayerStatsCallback) this.onPlayerStatsCallback(callerKey, playerKey, stats);
+            if (this.onPlayerStatsCallback) {
+                this.onPlayerStatsCallback(
+                    callerKey,
+                    playerKey,
+                    stats
+                );
+            }
         });
 
-        this.connection.onreconnecting(() => this._setStatus("RECONNECTING"));
-        this.connection.onreconnected(() => this._setStatus("CONNECTED"));
-        this.connection.onclose(() => this._setStatus("DISCONNECTED"));
+        this.connection.onreconnecting(() =>
+            this._setStatus("RECONNECTING")
+        );
+
+        this.connection.onreconnected(() =>
+            this._setStatus("CONNECTED")
+        );
+
+        this.connection.onclose(() =>
+            this._setStatus("DISCONNECTED")
+        );
     }
 
     _setStatus(newStatus) {
         this.status = newStatus;
-        if (this.onStatusChangeCallback) this.onStatusChangeCallback(this.status);
+
+        if (this.onStatusChangeCallback) {
+            this.onStatusChangeCallback(this.status);
+        }
     }
 
     async start() {
         try {
             await this.connection.start();
             this._setStatus("CONNECTED");
-        } catch (e) {
+        }
+        catch (e) {
             this._setStatus("RECONNECTING");
+
             setTimeout(() => this.start(), 5000);
+        }
+    }
+
+    async requestViewers() {
+        if (
+            this.connection.state ===
+            signalR.HubConnectionState.Connected
+        ) {
+            try {
+                await this.connection.invoke("RequestViewers");
+
+                console.log(
+                    "[ConnectionService] RequestViewers отправлен"
+                );
+            }
+            catch (err) {
+                console.error(
+                    "[ConnectionService] Ошибка RequestViewers:",
+                    err
+                );
+            }
+        }
+        else {
+            console.warn(
+                "[ConnectionService] SignalR не подключен"
+            );
         }
     }
 
@@ -62,11 +146,18 @@
         if (this.connection.state === signalR.HubConnectionState.Connected) {
             try {
                 await this.connection.invoke("RequestLeaderboard");
-            } catch (err) {
-                console.error("Ошибка вызова RequestLeaderboard:", err);
             }
-        } else {
-            console.warn("SignalR не подключен, невозможно запросить лидерборд");
+            catch (err) {
+                console.error(
+                    "Ошибка вызова RequestLeaderboard:",
+                    err
+                );
+            }
+        }
+        else {
+            console.warn(
+                "SignalR не подключен, невозможно запросить лидерборд"
+            );
         }
     }
 
@@ -87,19 +178,37 @@
             loserKey,
             loserDisplayName,
             loserColor,
-            timestamp);
+            timestamp
+        );
     }
 
     async requestPlayerStats(callerKey, playerKey) {
-        console.log(`Запрос статы для: ${callerKey} vs ${playerKey} отправлен`)
-        if (this.connection.state === signalR.HubConnectionState.Connected) {
+        console.log(
+            `Запрос статы для: ${callerKey} vs ${playerKey} отправлен`
+        );
+
+        if (
+            this.connection.state ===
+            signalR.HubConnectionState.Connected
+        ) {
             try {
-                await this.connection.invoke("RequestPlayerStats", callerKey, playerKey);
-            } catch (err) {
-                console.error("Ошибка вызова RequestPlayerStats:", err);
+                await this.connection.invoke(
+                    "RequestPlayerStats",
+                    callerKey,
+                    playerKey
+                );
             }
-        } else {
-            console.warn("SignalR не подключен, невозможно запросить статистику");
+            catch (err) {
+                console.error(
+                    "Ошибка вызова RequestPlayerStats:",
+                    err
+                );
+            }
+        }
+        else {
+            console.warn(
+                "SignalR не подключен, невозможно запросить статистику"
+            );
         }
     }
 }
