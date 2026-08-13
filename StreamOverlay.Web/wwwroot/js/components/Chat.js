@@ -67,6 +67,8 @@ export class Chat {
 
     appendMessage(payload) {
 
+        console.log('[Chat] appendMessage:', payload);
+
         if (!this.container) return;
 
 

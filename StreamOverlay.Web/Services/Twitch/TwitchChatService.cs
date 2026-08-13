@@ -69,6 +69,7 @@ public class TwitchChatService : BackgroundService
                 User: userName,
                 Message: e.ChatMessage.Message,
                 Color: userColor,
+                UserId: e.ChatMessage.UserId,
                 SendTime: formattedDate,
                 Emotes: emoteList,
                 Badges: badgeUrls,

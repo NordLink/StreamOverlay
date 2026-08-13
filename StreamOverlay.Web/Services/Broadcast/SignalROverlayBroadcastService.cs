@@ -85,6 +85,7 @@ public class SignalROverlayBroadcastService : IOverlayBroadcastService
             {
                 platform = dto.Platform,
                 user = dto.User,
+                userId = dto.UserId,
                 message = dto.Message,
                 color = dto.Color,
                 emotes = dto.Emotes,

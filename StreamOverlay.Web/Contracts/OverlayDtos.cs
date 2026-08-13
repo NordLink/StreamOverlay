@@ -21,6 +21,7 @@ public record OverlayChatMessageDto(
     string User,
     string Message,
     string? Color,
+    string? UserId = null,
     string? SendTime = null,
     List<OverlayEmoteDto>? Emotes = null,
     List<string>? Badges = null,

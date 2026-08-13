@@ -170,6 +170,7 @@ public class VkChatPollingService : BackgroundService
                     User: user,
                     Message: text,
                     Color: color,
+                    UserId: message.Author?.Id.ToString(),
                     Emotes: emoteList,
                     SendTime: sendTime
                 ),
