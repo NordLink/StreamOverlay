@@ -28,13 +28,26 @@ public record OverlayChatMessageDto(
     bool? IsHighlighted = false
  );
 
-public record OverlayViewerDto(
+public record OverlayChatterInfoDto(
+    string UserId,
     string Login,
     string DisplayName,
+    string Platform,
     DateTime DetectedAt
 );
 
-public record OverlayViewerLeftDto
+public record OverlayChatterLeftDto(
+    string UserId,
+    string Login,
+    string Platform
+);
+
+public class ChattersInfoDto
 {
+    public string UserId { get; init; } = "";
     public string Login { get; init; } = "";
+    public string DisplayName { get; init; } = "";
+    public string Platform { get; init; } = "";
+    public DateTime DetectedAt { get; set; }
 }
+

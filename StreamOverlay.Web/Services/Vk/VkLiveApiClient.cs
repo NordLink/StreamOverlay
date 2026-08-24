@@ -7,6 +7,7 @@ public interface IVkLiveApiClient
 {
     Task<VkMessagesResponse?> GetMessagesAsync(int limit, CancellationToken ct);
     Task<(int Count, bool IsLive)> GetViewersCountAsync(CancellationToken ct);
+    Task<VkChatMembersResponse?> GetChatMembersAsync(int limit, CancellationToken ct);
 }
 public class VkLiveApiClient : IVkLiveApiClient
 {
@@ -158,5 +159,46 @@ public class VkLiveApiClient : IVkLiveApiClient
         if (element.ValueKind == JsonValueKind.Array)
             return element.GetArrayLength();
         return 0;
+    }
+
+    public async Task<VkChatMembersResponse?> GetChatMembersAsync(
+    int limit,
+    CancellationToken ct)
+    {
+        if (!IsConfigured())
+            return null;
+
+        var query = new Dictionary<string, string?>
+        {
+            ["channel_url"] = _options.ChannelUrl,
+            ["limit"] = NormalizeLimit(limit).ToString()
+        };
+
+        using var request =
+            CreateGetRequest("v1/chat/members", query);
+
+        var http =
+            _httpClientFactory.CreateClient();
+
+        using var response =
+            await http.SendAsync(request, ct);
+
+        if (!response.IsSuccessStatusCode)
+        {
+            var error =
+                await response.Content.ReadAsStringAsync(ct);
+
+            _logger.LogWarning(
+                "VK chat members API error: {StatusCode}. {Body}",
+                response.StatusCode,
+                error);
+
+            return null;
+        }
+
+        var json =
+            await response.Content.ReadAsStringAsync(ct);
+
+        return Helper.Deserialize<VkChatMembersResponse>(json);
     }
 }

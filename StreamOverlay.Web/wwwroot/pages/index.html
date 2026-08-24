@@ -4,164 +4,66 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width,initial-scale=1" />
 
-    <title>Stream Panel</title>
-
-    <style>
-
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-        }
-        body {
-            min-height: 100vh;
-            background: radial-gradient(circle at 20% 30%, #0A141E, #0B1A2E);
-            font-family: 'Motiva Sans', 'Segoe UI', Arial, sans-serif;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            color: #E5E7EB;
-            padding: 2rem;
-        }
-        .container {
-            max-width: 900px;
-            width: 100%;
-            background: rgba(27,40,56,0.85);
-            backdrop-filter: blur(4px);
-            border-radius: 32px;
-            padding: 2.5rem 2rem 3rem;
-            box-shadow: 0 25px 40px rgba(0,0,0,.5), 0 0 0 1px rgba(102,153,204,.2);
-            text-align: center;
-        }
-        h1 {
-            font-size: 2.5rem;
-            font-weight: 600;
-            background: linear-gradient( 135deg, #ffffff, #9BB7D4 );
-            -webkit-background-clip: text;
-            background-clip: text;
-            color: transparent;
-            margin-bottom: .75rem;
-        }
-        .container p {
-            font-size: 1.1rem;
-            color: #B0C4DE;
-            margin-bottom: 2.5rem;
-            border-bottom: 1px dashed #2C4056;
-            display: inline-block;
-            padding-bottom: .5rem;
-        }
-        .nav-links {
-            display: flex;
-            flex-wrap: wrap;
-            justify-content: center;
-            gap: 1.5rem;
-        }
-        .nav-link {
-            display: inline-flex;
-            align-items: center;
-            gap: 12px;
-            background: linear-gradient( to bottom, #2A3A4F, #1E2A3A );
-            padding: .9rem 2rem;
-            border-radius: 60px;
-            font-size: 1.2rem;
-            font-weight: 600;
-            text-decoration: none;
-            color: #E0EFF9;
-            border: 1px solid rgba(102,153,204,.4);
-            box-shadow: 0 6px 0 #0F1A24;
-            transition: all .2s ease;
-        }
-            .nav-link:hover {
-                transform: translateY(-3px);
-                background: linear-gradient( to bottom, #3C556E, #263B4F );
-                color: white;
-            }
-        .secondary {
-            background: linear-gradient( to bottom, #27445e, #1C2F42 );
-        }
-        .twitch {
-            border-color: rgba(145,70,255,.8);
-            background: linear-gradient( to bottom, #9146FF, #6441A5 );
-            color: white;
-        }
-            .twitch:hover {
-                background: linear-gradient( to bottom, #A970FF, #7952C6 );
-            }
-        @media(max-width:550px) {
-            h1 {
-                font-size: 1.8rem;
-            }
-            .nav-link {
-                font-size: 1rem;
-                padding: .7rem 1.4rem;
-            }
-        }
-    </style>
+    <title>StreamOverlay</title>
+    <link rel="stylesheet" href="/css/index.css" />
+    <link rel="stylesheet" href="/css/chat.css">
+    <link rel="stylesheet" href="/css/viewers.css">
 
 </head>
 
 <body>
-    <div class="container">
-        <h1>
-            StreamOverlay Panel
-        </h1>
-        <p>
-            Выберите нужный раздел:
-        </p>
-        <div class="nav-links">
-            <a href="/demo"
-               class="nav-link"
-               target="_blank">
-                🖥️ Демо-сцена
-            </a>
-            <a href="/overlay"
-               class="nav-link secondary"
-               target="_blank">
-                🎥 Оверлей
-            </a>
-            <a href="/chat"
-               class="nav-link"
-               target="_blank">
-                💬 Чат
-            </a>
-            <a href="/viewers"
-               class="nav-link secondary"
-               target="_blank">
-
-                👥 Статистика
-
-            </a>
-
-            <a href="/chatters"
-               class="nav-link"
-               target="_blank">
-                👥 Зрители
-            </a>
-
-
-            <a href="/dueldisplay"
-               class="nav-link secondary"
-               target="_blank">
-
-                ⚔️ Дуэль
-
-            </a>
-
-            <a href="/auth/twitch/login"
-               class="nav-link twitch">
-
-                🎮 Авторизация Twitch
-
-            </a>
-
-
-
-        </div>
-
-
+    <div class="app">
+        <aside class="sidebar">
+            <div class="logo">
+                <div class="logo-title">
+                    StreamOverlay
+                </div>
+                <div class="logo-subtitle">
+                    Панель управления
+                </div>
+            </div>
+            <nav class="nav">
+                <div class="nav-title">
+                    Основное
+                </div>
+                <button class="nav-button active" data-page="home">
+                    <span class="nav-icon">🏠</span>
+                    <span>Главная</span>
+                </button>
+                <div class="nav-title">Виджеты</div>
+                <button class="nav-button" data-page="chat">
+                    <span class="nav-icon">💬</span>
+                    <span>Чат</span>
+                </button>
+                <button class="nav-button" data-page="viewers">
+                    <span class="nav-icon">🔢</span>
+                    <span>Счётчик зрителей</span>
+                </button>
+                <button class="nav-button" data-page="gameworld">
+                    <span class="nav-icon">🎮</span>
+                    <span>Игровой мир</span>
+                </button>
+                <button class="nav-button" data-page="dueldisplay">
+                    <span class="nav-icon">⚔️</span>
+                    <span>Дуэль</span>
+                </button>
+                <div class="nav-title">Док-панели</div>
+                <button class="nav-button" data-page="chatters">
+                    <span class="nav-icon">👥</span>
+                    <span>Чаттерсы</span>
+                </button>
+                <div class="nav-title">Система</div>
+                <button class="nav-button" data-page="settings">
+                    <span class="nav-icon">⚙️</span>
+                    <span>Настройки</span>
+                </button>
+            </nav>
+        </aside>
+        <main class="main">
+            <div id="app" class="content"></div>
+        </main>
     </div>
-
-
-
+    <script type="module" src="/js/orchestrates/homePage.js"></script>
 </body>
+
 </html>

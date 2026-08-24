@@ -82,3 +82,35 @@ public class VkTextPart
     [JsonPropertyName("content")]
     public string? Content { get; set; }
 }
+public class VkChatMembersResponse
+{
+    [JsonPropertyName("data")]
+    public VkChatMembersData Data { get; set; } = new();
+}
+
+public class VkChatMembersData
+{
+    [JsonPropertyName("users")]
+    public List<VkChatMember> Users { get; set; } = new();
+}
+
+public class VkChatMember
+{
+    [JsonPropertyName("avatar_url")]
+    public string AvatarUrl { get; set; } = "";
+
+    [JsonPropertyName("id")]
+    public long Id { get; set; }
+
+    [JsonPropertyName("is_moderator")]
+    public bool IsModerator { get; set; }
+
+    [JsonPropertyName("is_owner")]
+    public bool IsOwner { get; set; }
+
+    [JsonPropertyName("nick")]
+    public string Nick { get; set; } = "";
+
+    [JsonPropertyName("nick_color")]
+    public int NickColor { get; set; }
+}

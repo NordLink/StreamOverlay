@@ -2,90 +2,61 @@
 using System.Net.Http.Headers;
 using System.Text.Json;
 
-public class ViewerInfo
-{
-    public string Login { get; init; } = "";
-    public string DisplayName { get; init; } = "";
-    public DateTime DetectedAt { get; set; }
-}
-
-public class TwitchViewerService : BackgroundService
+public class TwitchChattersService : BackgroundService
 {
     private readonly IHttpClientFactory _httpClientFactory;
     private readonly TwitchAuthService _authService;
     private readonly TwitchOptions _options;
-    private readonly IOverlayBroadcastService _broadcastService;
-    private readonly ILogger<TwitchViewerService> _logger;
+    private readonly ILogger<TwitchChattersService> _logger;
 
-    private readonly TimeSpan _chattersRefreshInterval =
-        TimeSpan.FromSeconds(30);
+    private readonly ChattersAggregatorService _chattersAggregator;
 
-    private readonly Dictionary<string, DateTime> _chatterFirstSeen =
-        new(StringComparer.OrdinalIgnoreCase);
+    private readonly TimeSpan _chattersRefreshInterval = TimeSpan.FromSeconds(30);
 
     private string? _broadcasterId;
     private string? _moderatorId;
 
-    private List<ViewerInfo> _viewers = new();
-
-    private readonly object _viewersLock = new();
-
-    public TwitchViewerService(
-        IHttpClientFactory httpClientFactory,
-        TwitchAuthService authService,
-        IOptions<TwitchOptions> options,
-        ILogger<TwitchViewerService> logger,
-        IOverlayBroadcastService broadcastService)
+    public TwitchChattersService(
+     IHttpClientFactory httpClientFactory,
+     TwitchAuthService authService,
+     IOptions<TwitchOptions> options,
+     ILogger<TwitchChattersService> logger,
+     ChattersAggregatorService chattersAggregator)
     {
         _httpClientFactory = httpClientFactory;
         _authService = authService;
         _options = options.Value;
         _logger = logger;
-        _broadcastService = broadcastService;
+        _chattersAggregator = chattersAggregator;
     }
 
-    protected override async Task ExecuteAsync(
-        CancellationToken stoppingToken)
+    protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
         if (string.IsNullOrWhiteSpace(_options.WatchChannel))
         {
-            _logger.LogWarning(
-                "WATCH_CHANNEL не настроен.");
-
+            _logger.LogWarning("WATCH_CHANNEL не настроен.");
             return;
         }
 
-        _logger.LogInformation(
-            "TwitchViewerService запущен для канала {Channel}",
-            _options.WatchChannel);
+        _logger.LogInformation("TwitchViewerService запущен для канала {Channel}", _options.WatchChannel);
 
-        _broadcasterId = await ResolveUserIdAsync(
-            _options.WatchChannel,
-            stoppingToken);
+        _broadcasterId = await ResolveUserIdAsync(_options.WatchChannel,stoppingToken);
 
         if (_broadcasterId == null)
         {
-            _logger.LogError(
-                "Не удалось определить broadcaster id.");
-
+            _logger.LogError("Не удалось определить broadcaster id.");
             return;
         }
 
-        _moderatorId = await ResolveCurrentUserIdAsync(
-            stoppingToken);
+        _moderatorId = await ResolveCurrentUserIdAsync(stoppingToken);
 
         if (_moderatorId == null)
         {
-            _logger.LogError(
-                "Не удалось определить moderator id.");
-
+            _logger.LogError("Не удалось определить moderator id.");
             return;
         }
 
-        _logger.LogInformation(
-            "BroadcasterId={BroadcasterId} ModeratorId={ModeratorId}",
-            _broadcasterId,
-            _moderatorId);
+        _logger.LogInformation("BroadcasterId={BroadcasterId} ModeratorId={ModeratorId}", _broadcasterId, _moderatorId);
 
         while (!stoppingToken.IsCancellationRequested)
         {
@@ -94,7 +65,8 @@ public class TwitchViewerService : BackgroundService
                 var viewers = await GetChattersAsync(
                     stoppingToken);
 
-                await ProcessChattersAsync(
+                await _chattersAggregator.UpdatePlatformChattersAsync(
+                    "twitch",
                     viewers,
                     stoppingToken);
             }
@@ -124,104 +96,9 @@ public class TwitchViewerService : BackgroundService
         }
     }
 
-    private async Task ProcessChattersAsync(
-        List<ViewerInfo> chatters,
-        CancellationToken ct)
+    private async Task<string?> ResolveUserIdAsync(string login, CancellationToken ct)
     {
-        var currentLogins = chatters
-            .Select(x => x.Login)
-            .ToHashSet(StringComparer.OrdinalIgnoreCase);
-
-        HashSet<string> previousLogins;
-
-        lock (_viewersLock)
-        {
-            previousLogins = _viewers
-                .Select(x => x.Login)
-                .ToHashSet(StringComparer.OrdinalIgnoreCase);
-        }
-
-        // Новые зрители
-        var joined = chatters
-            .Where(x => !previousLogins.Contains(x.Login))
-            .ToList();
-
-        // Вышедшие зрители
-        var left = previousLogins
-            .Where(login => !currentLogins.Contains(login))
-            .ToList();
-
-        // Обновляем время первого обнаружения
-        UpdateChatterTimes(chatters);
-
-        // самые недавно обнаруженные — сверху
-        var sortedViewers = chatters
-            .OrderByDescending(x => x.DetectedAt)
-            .ToList();
-
-        lock (_viewersLock)
-        {
-            _viewers = sortedViewers;
-        }
-
-        foreach (var viewer in joined)
-        {
-            await _broadcastService.SendViewerJoinedAsync(
-                new OverlayViewerDto(
-                    viewer.Login,
-                    viewer.DisplayName,
-                    viewer.DetectedAt),
-                ct);
-        }
-
-        foreach (var login in left)
-        {
-            await _broadcastService.SendViewerLeftAsync(
-                new OverlayViewerLeftDto
-                {
-                    Login = login
-                },
-                ct);
-        }
-    }
-
-    private void UpdateChatterTimes(
-        List<ViewerInfo> chatters)
-    {
-        var now = DateTime.UtcNow;
-
-        foreach (var chatter in chatters)
-        {
-            if (!_chatterFirstSeen.ContainsKey(
-                    chatter.Login))
-            {
-                _chatterFirstSeen[chatter.Login] = now;
-            }
-
-            chatter.DetectedAt =
-                _chatterFirstSeen[chatter.Login];
-        }
-
-        var currentLogins = chatters
-            .Select(x => x.Login)
-            .ToHashSet(StringComparer.OrdinalIgnoreCase);
-
-        var disappeared = _chatterFirstSeen.Keys
-            .Where(login => !currentLogins.Contains(login))
-            .ToList();
-
-        foreach (var login in disappeared)
-        {
-            _chatterFirstSeen.Remove(login);
-        }
-    }
-
-    private async Task<string?> ResolveUserIdAsync(
-        string login,
-        CancellationToken ct)
-    {
-        var token =
-            await _authService.GetClientCredentialsAsync(ct);
+        var token = await _authService.GetClientCredentialsAsync(ct);
 
         if (token == null)
         {
@@ -267,14 +144,6 @@ public class TwitchViewerService : BackgroundService
         return data[0]
             .GetProperty("id")
             .GetString();
-    }
-
-    public IReadOnlyList<ViewerInfo> GetViewers()
-    {
-        lock (_viewersLock)
-        {
-            return _viewers.ToList();
-        }
     }
 
     private async Task<string?> ResolveCurrentUserIdAsync(
@@ -329,10 +198,10 @@ public class TwitchViewerService : BackgroundService
             .GetString();
     }
 
-    private async Task<List<ViewerInfo>> GetChattersAsync(
+    private async Task<List<ChattersInfoDto>> GetChattersAsync(
         CancellationToken ct)
     {
-        var result = new List<ViewerInfo>();
+        var result = new List<ChattersInfoDto>();
 
         var token =
             await _authService.GetUserAccessTokenAsync(ct);
@@ -395,15 +264,21 @@ public class TwitchViewerService : BackgroundService
                         .EnumerateArray())
             {
                 result.Add(
-                    new ViewerInfo
+                    new ChattersInfoDto
                     {
+                        UserId = chatter
+                            .GetProperty("user_id")
+                            .GetString() ?? "",
+
                         Login = chatter
                             .GetProperty("user_login")
                             .GetString() ?? "",
 
                         DisplayName = chatter
                             .GetProperty("user_name")
-                            .GetString() ?? ""
+                            .GetString() ?? "",
+
+                        Platform = "twitch"
                     });
             }
 

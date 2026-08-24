@@ -14,12 +14,12 @@ public interface IOverlayBroadcastService
         OverlayChatMessageDto dto,
         CancellationToken ct);
 
-    Task SendViewerJoinedAsync(
-        OverlayViewerDto dto,
+    Task SendChatterJoinedAsync(
+        OverlayChatterInfoDto dto,
         CancellationToken ct);
 
-    Task SendViewerLeftAsync(
-        OverlayViewerLeftDto dto,
+    Task SendChatterLeftAsync(
+        OverlayChatterLeftDto dto,
         CancellationToken ct);
 }
 
@@ -96,31 +96,35 @@ public class SignalROverlayBroadcastService : IOverlayBroadcastService
             ct);
     }
 
-    public Task SendViewerJoinedAsync(
-        OverlayViewerDto dto,
+    public Task SendChatterJoinedAsync(
+        OverlayChatterInfoDto dto,
         CancellationToken ct)
     {
         return _hub.Clients.All.SendAsync(
-            "viewerJoined",
+            "chatterJoined",
             new
             {
+                userId = dto.UserId,
                 login = dto.Login,
                 displayName = dto.DisplayName,
+                platform = dto.Platform,
                 detectedAt = dto.DetectedAt
             },
             ct);
     }
 
-    public Task SendViewerLeftAsync(
-        OverlayViewerLeftDto dto,
-        CancellationToken ct)
-    {
-        return _hub.Clients.All.SendAsync(
-            "viewerLeft",
-            new
-            {
-                login = dto.Login
-            },
-            ct);
-    }
+    public Task SendChatterLeftAsync(
+    OverlayChatterLeftDto dto,
+    CancellationToken ct)
+{
+    return _hub.Clients.All.SendAsync(
+        "chatterLeft",
+        new
+        {
+            userId = dto.UserId,
+            login = dto.Login,
+            platform = dto.Platform
+        },
+        ct);
+}
 }

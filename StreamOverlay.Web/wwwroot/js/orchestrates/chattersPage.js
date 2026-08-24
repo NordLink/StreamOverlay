@@ -7,36 +7,21 @@ async function bootstrap() {
 
     const connection = new ConnectionService('/chat-hub');
 
-    connection.onInitialViewersCallback = (viewers) => {
-
-        console.log(
-            "[ChattersPage] viewersInitial:",
-            viewers
-        );
-
+    connection.onInitialChattersCallback = (viewers) => {
+        console.log("[ChattersPage] viewersInitial:", viewers);
         for (const viewer of viewers) {
             chatters.addViewer(viewer);
         }
     };
 
-    connection.onViewerJoinedCallback = (viewer) => {
-
-        console.log(
-            "[ChattersPage] viewerJoined:",
-            viewer
-        );
-
+    connection.onChatterJoinedCallback = (viewer) => {
+        console.log("[ChattersPage] присоединился чаттер:", viewer);
         chatters.addViewer(viewer);
     };
 
-    connection.onViewerLeftCallback = (viewer) => {
-
-        console.log(
-            "[ChattersPage] viewerLeft:",
-            viewer
-        );
-
-        chatters.removeViewer(viewer.login);
+    connection.onChatterLeftCallback = (viewer) => {
+        console.log("[ChattersPage] вышел чаттер:", viewer);
+        chatters.removeViewer(viewer);
     };
 
     await connection.start();

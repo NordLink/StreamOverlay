@@ -4,19 +4,19 @@
 [Route("api/[controller]")]
 public class ChattersController : ControllerBase
 {
-    private readonly TwitchViewerService _twitchViewerService;
+    private readonly ChattersAggregatorService _chattersAggregator;
 
     public ChattersController(
-        TwitchViewerService twitchViewerService)
+        ChattersAggregatorService chattersAggregator)
     {
-        _twitchViewerService = twitchViewerService;
+        _chattersAggregator = chattersAggregator;
     }
 
     [HttpGet]
     public IActionResult GetViewers()
     {
-        var twitchViewers = _twitchViewerService.GetViewers();
+        var chatters = _chattersAggregator.GetViewers();
 
-        return Ok(twitchViewers);
+        return Ok(chatters);
     }
 }

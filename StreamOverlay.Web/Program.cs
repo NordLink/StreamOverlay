@@ -47,10 +47,12 @@ builder.Services.AddSingleton<IOverlayBroadcastService, SignalROverlayBroadcastS
 builder.Services.AddSingleton<OverlayStateService>();
 builder.Services.AddSingleton<TwitchAuthService>();
 builder.Services.AddSingleton<TwitchBadgeService>();
-builder.Services.AddSingleton<TwitchViewerService>();
+builder.Services.AddSingleton<ChattersAggregatorService>();
+builder.Services.AddHostedService<VkChattersService>();
+builder.Services.AddSingleton<TwitchChattersService>();
 
 builder.Services.AddHostedService(sp =>
-    sp.GetRequiredService<TwitchViewerService>());
+    sp.GetRequiredService<TwitchChattersService>());
 builder.Services.AddSingleton<IVkLiveApiClient, VkLiveApiClient>();
 builder.Services.AddHostedService<TwitchChannelInfoService>();
 builder.Services.AddHostedService<TwitchChatService>();

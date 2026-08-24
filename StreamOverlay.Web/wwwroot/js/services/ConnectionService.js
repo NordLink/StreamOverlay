@@ -12,9 +12,9 @@
         this.onViewerCountCallback = null;
         this.onChatMessageCallback = null;
 
-        this.onViewerJoinedCallback = null;
-        this.onViewerLeftCallback = null;
-        this.onInitialViewersCallback = null;
+        this.onChatterJoinedCallback = null;
+        this.onChatterLeftCallback = null;
+        this.onInitialChattersCallback = null;
 
         this.onStatusChangeCallback = null;
         this.onLeaderboardUpdateCallback = null;
@@ -42,28 +42,22 @@
             }
         });
 
-        this.connection.on("viewersInitial", (payload) => {
-
-            console.log(
-                "[ConnectionService] viewersInitial:",
-                payload
-            );
-
-            if (this.onInitialViewersCallback) {
-                this.onInitialViewersCallback(payload);
-            }
-
-        });
-
-        this.connection.on("viewerJoined", (payload) => {
-            if (this.onViewerJoinedCallback) {
-                this.onViewerJoinedCallback(payload);
+        this.connection.on("chattersInitial", (payload) => {
+            console.log("[ConnectionService] chattersInitial:", payload);
+            if (this.onInitialChattersCallback) {
+                this.onInitialChattersCallback(payload);
             }
         });
 
-        this.connection.on("viewerLeft", (payload) => {
-            if (this.onViewerLeftCallback) {
-                this.onViewerLeftCallback(payload);
+        this.connection.on("chatterJoined", (payload) => {
+            if (this.onChatterJoinedCallback) {
+                this.onChatterJoinedCallback(payload);
+            }
+        });
+
+        this.connection.on("chatterLeft", (payload) => {
+            if (this.onChatterLeftCallback) {
+                this.onChatterLeftCallback(payload);
             }
         });
 
